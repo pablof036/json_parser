@@ -1,3 +1,5 @@
+
+/// Holds the possible types of a JSON object, with a String as field name
 #[derive(Debug, Eq, PartialEq)]
 pub enum JsonType {
     Int(String),
@@ -8,6 +10,7 @@ pub enum JsonType {
     JsonArray(String, JsonArrayType)
 }
 
+/// Holds the possible types of a Json array (no field name).
 #[derive(Debug, Eq, PartialEq)]
 pub enum JsonArrayType {
     Int,

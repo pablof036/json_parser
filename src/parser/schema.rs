@@ -1,11 +1,15 @@
 use crate::parser::types::JsonType;
-
+///Stores JSON Schema
 #[derive(Debug, Eq, PartialEq)]
 struct JsonSchema {
     fields: Vec<JsonType>
 }
 
 impl JsonSchema {
+
+    /// Creates a new struct instance and starts parsing
+    /// # Arguments
+    /// * `file` - String containing valid JSON.
     fn new(file: String) -> Self {
         Self {
             fields: vec![]
