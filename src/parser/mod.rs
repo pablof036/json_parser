@@ -1,2 +1,3 @@
-mod schema;
 mod types;
+mod token;
+mod lexer;
