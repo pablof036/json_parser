@@ -1,8 +1,10 @@
 use std::iter::{Enumerate, Peekable};
 use std::str::{Chars, Lines};
-use crate::parser::lexer::NextStep::{Done, LexCharacter};
+use crate::parser::lexer::NextStep::{LexCharacter};
 use crate::parser::token::{JsonToken, JsonType, Token};
 
+
+/// Next step for the character lexer.
 #[derive(Debug, PartialEq, Eq)]
 enum NextStep {
     LexNumberType,
@@ -13,6 +15,8 @@ enum NextStep {
     Done
 }
 
+
+/// Next Step for the lexer closure.
 #[derive(Debug, PartialEq, Eq)]
 enum NextLexStep {
     Done,
@@ -20,7 +24,7 @@ enum NextLexStep {
     Skip
 }
 
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     json: &'a str,
     lines: Enumerate<Lines<'a>>,
     current_line: usize,
@@ -29,9 +33,12 @@ struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    fn new(json: &'a str) -> Self {
+
+    ///Creates a new lexer.
+    /// # Parameters
+    /// * `json` JSON String
+    pub fn new(json: &'a str) -> Self {
         let lines = json.lines().enumerate();
-        let char_iter = json.chars().enumerate();
         Self {
             json,
             lines,
@@ -41,6 +48,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Processes basic tokens. Delegates to other functions for primitive types.
     fn lex_character(&mut self) -> NextStep {
         if let Some(char_iter) = &mut self.char_iter {
             while let Some((i, char)) = char_iter.next() {
@@ -82,13 +90,14 @@ impl<'a> Lexer<'a> {
                         return NextStep::LexBoolean;
                     },
                     '"' => {
-                        let last_added = &self.tokens.last().unwrap().value;
-
-                        if last_added == &JsonToken::Comma || last_added == &JsonToken::ObjectStart {
-                            return NextStep::LexName;
-                        } else if last_added == &JsonToken::Colon {
-                            return NextStep::LexString;
-                        }
+                        if let Some(last_token) = &self.tokens.last() {
+                            let last_added = &last_token.value;
+                            if last_added == &JsonToken::Comma || last_added == &JsonToken::ObjectStart {
+                                return NextStep::LexName;
+                            } else if last_added == &JsonToken::Colon {
+                                return NextStep::LexString;
+                            }
+                        };
                     }
                     _ => ()
                 }
@@ -104,6 +113,11 @@ impl<'a> Lexer<'a> {
         return NextStep::Done
     }
 
+    /// Basic lexer for primitive types. Runs a closure which returns the next step for the lexer (advance the iterator, skip a character or end the lexer).
+    /// # Parameter
+    /// * `f` - Closure which runs for each next characters. The iterator will be advanced (or not) depending of the returned value.
+    /// # Returns
+    /// Column of the first character of the token. For error message support.
     fn lex<F: FnMut((&usize, &char)) -> NextLexStep>(&mut self, mut f: F) -> Option<usize>{
         let mut token_start = None;
 
@@ -129,6 +143,7 @@ impl<'a> Lexer<'a> {
         token_start
     }
 
+    /// Processes a boolean datatype.
     fn lex_boolean(&mut self) {
         let token_start = self.lex(|(i, next_char)| {
            match next_char {
@@ -148,11 +163,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Processes a field name.
     fn lex_name(&mut self) {
         let mut end_index = 0;
         let token_start = self.lex( |(i, next_char)| {
            match next_char {
-               '\\' => NextLexStep::Advance,
                '"' => NextLexStep::Done,
                _ => {
                    end_index = *i;
@@ -172,6 +187,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Processes a String value.
     fn lex_string(&mut self) {
         let token_start = self.lex(|(i, next_char)| {
             match next_char {
@@ -192,6 +208,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Processes a number value. Defaults to adding a int token, will add a float token if it encounters a point(`.`) character.
     fn lex_number(&mut self) {
         let mut is_float = false;
 
@@ -217,7 +234,10 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn start_lex(mut self) -> Vec<Token<'a>> {
+    /// Consumes the structure and start the lexing process.
+    /// # Returns
+    /// Vec of Token structures.
+    pub fn start_lex(mut self) -> Vec<Token<'a>> {
         let mut step = self.lex_character();
         while step != NextStep::Done {
             match step {
