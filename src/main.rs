@@ -1,7 +1,5 @@
 use std::{env, process};
-use crate::lib::run;
 
-mod parser;
 mod lib;
 
 fn main() {
@@ -10,7 +8,7 @@ fn main() {
         process::exit(1);
     });
 
-    if let Err(e) = run(filename) {
+    if let Err(e) = lib::run(filename) {
         eprintln!("Error while running: {}", e);
     }
 }

@@ -1,7 +1,7 @@
 use std::iter::{Enumerate, Peekable};
 use std::str::{Chars, Lines};
-use crate::parser::lexer::NextStep::{LexCharacter};
-use crate::parser::token::{JsonToken, JsonType, Token};
+use crate::lib::parser::lexer::NextStep::{LexCharacter};
+use crate::lib::parser::token::{JsonToken, JsonType, Token};
 
 
 /// Next step for the character lexer.
@@ -28,6 +28,7 @@ pub struct Lexer<'a> {
     json: &'a str,
     lines: Enumerate<Lines<'a>>,
     current_line: usize,
+    current_line_str: Option<&'a str>,
     char_iter: Option<Peekable<Enumerate<Chars<'a>>>>,
     tokens: Vec<Token<'a>>,
 }
@@ -43,6 +44,7 @@ impl<'a> Lexer<'a> {
             json,
             lines,
             current_line: 0,
+            current_line_str: None,
             char_iter: None,
             tokens: vec![],
         }
@@ -105,6 +107,7 @@ impl<'a> Lexer<'a> {
         }
 
         if let Some((i, line)) = self.lines.next() {
+            self.current_line_str = Some(line);
             self.char_iter = Some(line.chars().enumerate().peekable());
             self.current_line = i;
             return NextStep::LexCharacter
@@ -146,10 +149,10 @@ impl<'a> Lexer<'a> {
     /// Processes a boolean datatype.
     fn lex_boolean(&mut self) {
         let token_start = self.lex(|(i, next_char)| {
-           match next_char {
-               ',' => NextLexStep::Done,
-               _ => NextLexStep::Advance,
-           }
+            match next_char {
+                ',' | '}' => NextLexStep::Done,
+                _ => NextLexStep::Advance,
+            }
         });
 
         if let Some(token_start) = token_start {
@@ -166,24 +169,53 @@ impl<'a> Lexer<'a> {
     /// Processes a field name.
     fn lex_name(&mut self) {
         let mut end_index = 0;
-        let token_start = self.lex( |(i, next_char)| {
-           match next_char {
-               '"' => NextLexStep::Done,
-               _ => {
-                   end_index = *i;
-                   return NextLexStep::Advance;
-               }
-           }
-        });
 
-        if let Some(token_start) = token_start {
-            self.tokens.push(
-                Token {
-                    value: JsonToken::Name(&self.json[token_start..end_index + 1]),
-                    col: token_start,
-                    line: self.current_line
+
+        let mut start_index = 0;
+        let mut end_index = 0;
+
+        let mut start_char = None;
+        let mut end_char = None;
+
+        if let Some(char_iter) = &mut self.char_iter {
+            while let Some((i, char)) = char_iter.next() {
+                if let Some((_, next_char)) = char_iter.peek() {
+                    if start_char == None {
+                        start_char = Some(char);
+                        start_index = i;
+                    }
+
+                    if next_char == &'"' {
+                        end_char = Some(char);
+                        end_index = i;
+
+                        break
+                    }
                 }
-            )
+            }
+        }
+
+
+        if let Some(start_char) = start_char {
+            if let Some(end_char) = end_char {
+                if let Some(current_line_str) = self.current_line_str {
+                    while current_line_str[start_index..start_index + 1] != start_char.to_string() {
+                        start_index += 1;
+                    }
+
+                    while current_line_str[end_index..end_index + 1] != end_char.to_string() {
+                        end_index += 1;
+                    }
+
+                    self.tokens.push(
+                        Token {
+                            value: JsonToken::Name(&current_line_str[start_index..end_index + 1]),
+                            col: start_index,
+                            line: self.current_line
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -394,5 +426,33 @@ mod tests {
         let tokens: Vec<JsonToken> = lexer.start_lex().into_iter().map(|token| token.value).collect();
 
         assert_eq!(tokens, expected_result);
+    }
+
+
+    #[test]
+    fn lex_bad_name_after_degree_symbol() {
+        let json = "{\"2\":\"aº\", \"ab\": 32}";
+
+        let expected_result = vec![
+            JsonToken::ObjectStart, JsonToken::Name("2"), JsonToken::Colon,
+            JsonToken::Value(JsonType::String), JsonToken::Comma, JsonToken::Name("ab"),
+            JsonToken::Colon, JsonToken::Value(JsonType::Int), JsonToken::ObjectEnd
+        ];
+
+        let lexer = Lexer::new(json);
+        let tokens: Vec<JsonToken> = lexer.start_lex().into_iter().map(|token| token.value).collect();
+        assert_eq!(tokens, expected_result)
+    }
+
+    #[test]
+    fn lex_bool_end_on_right_brace() {
+        let json =  "true}";
+        let expected_result = vec![
+            JsonToken::Value(JsonType::Bool), JsonToken::ObjectEnd
+        ];
+
+        let lexer = Lexer::new(json);
+        let tokens: Vec<JsonToken> = lexer.start_lex().into_iter().map(|token| token.value).collect();
+        assert_eq!(tokens, expected_result)
     }
 }

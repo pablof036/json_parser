@@ -19,5 +19,5 @@ pub enum JsonArrayType<'a> {
     String,
     Bool,
     JsonObject(Vec<JsonTree<'a>>),
-    JsonArray(Box<JsonTree<'a>>)
+    JsonArray(Box<JsonArrayType<'a>>)
 }

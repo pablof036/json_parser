@@ -1,8 +1,18 @@
 use std::fs;
+use crate::lib::parser::lexer::Lexer;
+use crate::lib::parser::token::Tokenizer;
+
+mod parser;
 
 pub fn run(filename: String) -> anyhow::Result<()> {
     let file = fs::read_to_string(filename)?;
 
+    let lexer = Lexer::new(&file);
+    let lexer_result = lexer.start_lex();
+    let token = Tokenizer::new(lexer_result);
+    let result = token.start_tokenizer()?;
+
+    println!("{:#?}", result);
 
     Ok(())
 }
