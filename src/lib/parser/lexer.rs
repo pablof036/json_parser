@@ -199,17 +199,17 @@ impl<'a> Lexer<'a> {
         if let Some(start_char) = start_char {
             if let Some(end_char) = end_char {
                 if let Some(current_line_str) = self.current_line_str {
-                    while current_line_str[start_index..start_index + 1] != start_char.to_string() {
+                    while current_line_str[start_index..=start_index] != start_char.to_string() {
                         start_index += 1;
                     }
 
-                    while current_line_str[end_index..end_index + 1] != end_char.to_string() {
+                    while current_line_str[end_index..=end_index] != end_char.to_string() {
                         end_index += 1;
                     }
 
                     self.tokens.push(
                         Token {
-                            value: JsonToken::Name(&current_line_str[start_index..end_index + 1]),
+                            value: JsonToken::Name(&current_line_str[start_index..=end_index]),
                             col: start_index,
                             line: self.current_line
                         }
