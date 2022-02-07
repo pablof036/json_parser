@@ -1,7 +1,7 @@
 use std::iter::{Enumerate, Peekable};
 use std::str::{Chars, Lines};
 use crate::lib::parser::lexer::NextStep::{LexCharacter};
-use crate::lib::parser::token::{JsonToken, JsonType, Token};
+use crate::lib::model::token::{JsonToken, JsonType, Token};
 
 
 /// Next step for the character lexer.
@@ -148,7 +148,7 @@ impl<'a> Lexer<'a> {
     fn lex_boolean_or_null(&mut self) {
         let mut is_null = false;
 
-        let token_start = self.lex(|(i, next_char)| {
+        let token_start = self.lex(|(_, next_char)| {
             match next_char {
                 'l' => {
                     is_null = true;
@@ -227,7 +227,7 @@ impl<'a> Lexer<'a> {
 
     /// Processes a String value.
     fn lex_string(&mut self) {
-        let token_start = self.lex(|(i, next_char)| {
+        let token_start = self.lex(|(_, next_char)| {
             match next_char {
                 '\\' => NextLexStep::Skip,
                 '"' => NextLexStep::Done,
@@ -250,7 +250,7 @@ impl<'a> Lexer<'a> {
     fn lex_number(&mut self) {
         let mut is_float = false;
 
-        let token_start = self.lex(|(i, next_char)| {
+        let token_start = self.lex(|(_, next_char)| {
             match next_char {
                 '0'..='9' => NextLexStep::Advance,
                 '.' => {
@@ -306,8 +306,8 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lib::parser::lexer::{Lexer, NextStep};
-    use crate::lib::parser::token::{JsonToken, JsonType};
+    use crate::lib::parser::lexer::Lexer;
+    use crate::lib::model::token::{JsonToken, JsonType};
 
     #[test]
     fn simple_json() {

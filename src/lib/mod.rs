@@ -3,6 +3,7 @@ use crate::lib::parser::lexer::Lexer;
 use crate::lib::parser::token::Tokenizer;
 
 mod parser;
+mod model;
 
 pub fn run(filename: String) -> anyhow::Result<()> {
     let file = fs::read_to_string(filename)?;

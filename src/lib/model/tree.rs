@@ -1,4 +1,3 @@
-
 /// Holds the possible types of a JSON object, with a String as field name
 #[derive(Debug, Eq, PartialEq)]
 pub enum JsonTree<'a> {

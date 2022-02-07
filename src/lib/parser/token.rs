@@ -1,44 +1,9 @@
-use std::cell::RefCell;
 use std::iter::{Enumerate, Peekable};
-use std::rc::Rc;
 use std::vec::IntoIter;
-use crate::lib::parser::types::{JsonArrayType, JsonTree};
+use crate::lib::model::tree::{JsonArrayType, JsonTree};
 use thiserror::Error;
+use crate::lib::model::token::{JsonToken, JsonType, Token};
 use crate::lib::parser::token::TokenizerError::{NullNotSupportedError, SyntaxError};
-use crate::lib::parser::types::JsonArrayType::JsonObject;
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum JsonToken<'a> {
-    ObjectStart,
-    ObjectEnd,
-    ArrayStart,
-    ArrayEnd,
-    Colon,
-    Comma,
-    Name(&'a str),
-    Value(JsonType),
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum JsonType {
-    Int,
-    Float,
-    Bool,
-    String,
-    Null
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct Token<'a> {
-    pub line: usize,
-    pub col: usize,
-    pub value: JsonToken<'a>,
-}
-
-pub struct Tree<'a, T> {
-    current: Rc<RefCell<&'a mut Vec<T>>>,
-    parents: Vec<Rc<RefCell<&'a mut Vec<T>>>>
-}
 
 #[derive(Error, Debug)]
 enum TokenizerError  {
@@ -93,7 +58,7 @@ impl<'a> Tokenizer<'a> {
     fn parse_array_token(&mut self, name: &'a str) -> Result<JsonTree<'a>, TokenizerError> {
         let mut array_type = None;
 
-        while let Some((i, token)) = self.token_iter.next() {
+        while let Some((_, token)) = self.token_iter.next() {
             match token.value {
                 JsonToken::ArrayEnd => {
                     if let Some(array_type) = array_type {
@@ -216,7 +181,7 @@ impl<'a> Tokenizer<'a> {
 mod tests {
     use crate::lib::parser::lexer::Lexer;
     use crate::lib::parser::token::Tokenizer;
-    use crate::lib::parser::types::{JsonArrayType, JsonTree};
+    use crate::lib::model::tree::{JsonArrayType, JsonTree};
 
     #[test]
     #[should_panic]
