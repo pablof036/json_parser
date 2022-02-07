@@ -3,7 +3,7 @@ use std::vec::IntoIter;
 use crate::lib::model::tree::{JsonArrayType, JsonTree};
 use thiserror::Error;
 use crate::lib::model::token::{JsonToken, JsonType, Token};
-use crate::lib::parser::token::TokenizerError::{NullNotSupportedError, SyntaxError};
+use crate::lib::parser::tokenizer::TokenizerError::{NullNotSupportedError, SyntaxError};
 
 #[derive(Error, Debug)]
 enum TokenizerError  {
@@ -36,7 +36,7 @@ impl<'a> Tokenizer<'a> {
             }
 
             if let JsonArrayType::JsonObject(mut old_tree) = old_type {
-                if let JsonArrayType::JsonObject(mut new_tree) = new_type {
+                if let JsonArrayType::JsonObject(new_tree) = new_type {
                     new_tree.into_iter().for_each(|json_type| {
                        if !old_tree.contains(&json_type) {
                            old_tree.push(json_type)
@@ -180,7 +180,7 @@ impl<'a> Tokenizer<'a> {
 #[cfg(test)]
 mod tests {
     use crate::lib::parser::lexer::Lexer;
-    use crate::lib::parser::token::Tokenizer;
+    use crate::lib::parser::tokenizer::Tokenizer;
     use crate::lib::model::tree::{JsonArrayType, JsonTree};
 
     #[test]
@@ -279,12 +279,6 @@ mod tests {
     #[should_panic]
     fn different_nested_array_error() {
         let json = "{\"f1\": [[5, 3], [2.0, 1.0]]}";
-
-        let expected_result = JsonTree::Root(
-            vec![
-                JsonTree::JsonArray("f1", JsonArrayType::JsonArray(Box::new(JsonArrayType::Int)))
-            ]
-        );
 
         let lexer = Lexer::new(json);
         let lexer_result = lexer.start_lex();
