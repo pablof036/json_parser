@@ -19,7 +19,7 @@ pub fn run(filename: String) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::run;
+    use crate::lib::run;
 
     #[test]
     fn runs_on_valid_path() -> anyhow::Result<()>{

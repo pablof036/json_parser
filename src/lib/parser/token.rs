@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::vec::IntoIter;
 use crate::lib::parser::types::{JsonArrayType, JsonTree};
 use thiserror::Error;
-use crate::lib::parser::token::TokenizerError::SyntaxError;
+use crate::lib::parser::token::TokenizerError::{NullNotSupportedError, SyntaxError};
 use crate::lib::parser::types::JsonArrayType::JsonObject;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -25,6 +25,7 @@ pub enum JsonType {
     Float,
     Bool,
     String,
+    Null
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -40,11 +41,15 @@ pub struct Tree<'a, T> {
 }
 
 #[derive(Error, Debug)]
-enum TokenizerError {
+enum TokenizerError  {
     #[error("syntax error detected near line {0} column {1}")]
     SyntaxError(usize, usize),
     #[error("unknown syntax error")]
     UnknownSyntaxError,
+    #[error("null values are not supported. Near line {0} column {1}")]
+    NullNotSupportedError(usize, usize),
+    #[error("empty arrays are not supported. Near line {0} column {1}")]
+    EmptyArrayNotSupportedError(usize, usize),
 }
 
 #[derive(Debug)]
@@ -95,7 +100,7 @@ impl<'a> Tokenizer<'a> {
                         return Ok(JsonTree::JsonArray(name, array_type));
                     }
 
-                    return Err(TokenizerError::SyntaxError(token.line, token.col));
+                    return Err(TokenizerError::EmptyArrayNotSupportedError(token.line, token.col));
                 },
                 JsonToken::ArrayStart => {
                     let deeper_array = self.parse_array_token("")?;
@@ -118,6 +123,7 @@ impl<'a> Tokenizer<'a> {
                         JsonType::Float => value_type = JsonArrayType::Float,
                         JsonType::Bool => value_type = JsonArrayType::Bool,
                         JsonType::String => value_type = JsonArrayType::String,
+                        JsonType::Null => return Err(NullNotSupportedError(token.line, token.col)),
                     }
                     array_type = Some(Self::parse_new_array_type(array_type, value_type, token.line, token.col)?);
                 },
@@ -186,6 +192,7 @@ impl<'a> Tokenizer<'a> {
                             JsonType::Float => object.push(JsonTree::Float(name)),
                             JsonType::Bool => object.push(JsonTree::Bool(name)),
                             JsonType::String => object.push(JsonTree::String(name)),
+                            JsonType::Null => return Err(TokenizerError::NullNotSupportedError(token.line, token.col))
                         }
                     } else {
                         return Err(TokenizerError::SyntaxError(token.line, token.col));
@@ -207,9 +214,9 @@ impl<'a> Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::lexer::Lexer;
-    use crate::parser::token::{JsonType, Tokenizer};
-    use crate::parser::types::{JsonArrayType, JsonTree};
+    use crate::lib::parser::lexer::Lexer;
+    use crate::lib::parser::token::Tokenizer;
+    use crate::lib::parser::types::{JsonArrayType, JsonTree};
 
     #[test]
     #[should_panic]
@@ -365,5 +372,28 @@ mod tests {
 
         assert_eq!(tree, expected_result);
     }
+
+
+    #[test]
+    #[should_panic(expected = "null values are not supported")]
+    fn fail_on_null() {
+        let json = "{ \"f2\": null }";
+        let lexer = Lexer::new(json);
+        let lexer_result = lexer.start_lex();
+        let tokenizer = Tokenizer::new(lexer_result);
+        tokenizer.start_tokenizer().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "empty arrays are not supported")]
+    fn fail_on_empty_array() {
+        let json = "{ \"f2\": [] }";
+        let lexer = Lexer::new(json);
+        let lexer_result = lexer.start_lex();
+        let tokenizer = Tokenizer::new(lexer_result);
+        tokenizer.start_tokenizer().unwrap();
+    }
+
+
 
 }

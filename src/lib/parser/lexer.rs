@@ -11,7 +11,7 @@ enum NextStep {
     LexCharacter,
     LexName,
     LexString,
-    LexBoolean,
+    LexBooleanOrNull,
     Done
 }
 
@@ -25,7 +25,6 @@ enum NextLexStep {
 }
 
 pub struct Lexer<'a> {
-    json: &'a str,
     lines: Enumerate<Lines<'a>>,
     current_line: usize,
     current_line_str: Option<&'a str>,
@@ -41,7 +40,6 @@ impl<'a> Lexer<'a> {
     pub fn new(json: &'a str) -> Self {
         let lines = json.lines().enumerate();
         Self {
-            json,
             lines,
             current_line: 0,
             current_line_str: None,
@@ -88,8 +86,8 @@ impl<'a> Lexer<'a> {
                     '0'..='9' => {
                         return NextStep::LexNumberType;
                     },
-                    't' | 'f' => {
-                        return NextStep::LexBoolean;
+                    't' | 'f' | 'n' => {
+                        return NextStep::LexBooleanOrNull;
                     },
                     '"' => {
                         if let Some(last_token) = &self.tokens.last() {
@@ -147,9 +145,19 @@ impl<'a> Lexer<'a> {
     }
 
     /// Processes a boolean datatype.
-    fn lex_boolean(&mut self) {
+    fn lex_boolean_or_null(&mut self) {
+        let mut is_null = false;
+
         let token_start = self.lex(|(i, next_char)| {
             match next_char {
+                'l' => {
+                    is_null = true;
+                    NextLexStep::Advance
+                },
+                's' => {
+                    is_null = false;
+                    NextLexStep::Advance
+                }
                 ',' | '}' => NextLexStep::Done,
                 _ => NextLexStep::Advance,
             }
@@ -158,7 +166,7 @@ impl<'a> Lexer<'a> {
         if let Some(token_start) = token_start {
             self.tokens.push(
                 Token {
-                    value: JsonToken::Value(JsonType::Bool),
+                    value: JsonToken::Value(if is_null {JsonType::Null} else {JsonType::Bool}),
                     col: token_start,
                     line: self.current_line,
                 }
@@ -168,8 +176,6 @@ impl<'a> Lexer<'a> {
 
     /// Processes a field name.
     fn lex_name(&mut self) {
-        let mut end_index = 0;
-
 
         let mut start_index = 0;
         let mut end_index = 0;
@@ -286,9 +292,9 @@ impl<'a> Lexer<'a> {
                     step = LexCharacter;
                     self.lex_string();
                 },
-                NextStep::LexBoolean => {
+                NextStep::LexBooleanOrNull => {
                     step = LexCharacter;
-                    self.lex_boolean();
+                    self.lex_boolean_or_null();
                 }
                 _ => (),
             }
@@ -300,8 +306,8 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::lexer::{Lexer, NextStep};
-    use crate::parser::token::{JsonToken, JsonType};
+    use crate::lib::parser::lexer::{Lexer, NextStep};
+    use crate::lib::parser::token::{JsonToken, JsonType};
 
     #[test]
     fn simple_json() {
@@ -453,6 +459,19 @@ mod tests {
 
         let lexer = Lexer::new(json);
         let tokens: Vec<JsonToken> = lexer.start_lex().into_iter().map(|token| token.value).collect();
+        assert_eq!(tokens, expected_result)
+    }
+
+    #[test]
+    fn null_token() {
+        let json = "null";
+        let expected_result = vec![
+            JsonToken::Value(JsonType::Null)
+        ];
+
+        let lexer = Lexer::new(json);
+        let tokens: Vec<JsonToken> = lexer.start_lex().into_iter().map(|token| token.value).collect();
+
         assert_eq!(tokens, expected_result)
     }
 }
