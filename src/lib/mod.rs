@@ -1,6 +1,8 @@
 use std::fs;
+use crate::lib::model::transform_config::RUST_DEFINITION;
 use crate::lib::parser::lexer::Lexer;
 use crate::lib::parser::tokenizer::Tokenizer;
+use crate::lib::transformer::Transformer;
 
 mod parser;
 mod model;
@@ -12,7 +14,9 @@ pub fn run(filename: String) -> anyhow::Result<()> {
     let lexer = Lexer::new(&file);
     let lexer_result = lexer.start_lex();
     let token = Tokenizer::new(lexer_result);
-    let result = token.start_tokenizer()?;
+    let tokenizer_result = token.start_tokenizer()?;
+    let transformer = Transformer::new(RUST_DEFINITION, tokenizer_result, None)?;
+    let result = transformer.start_transform();
 
     println!("{:#?}", result);
 
