@@ -1,12 +1,12 @@
 #[derive(Debug, Eq, PartialEq)]
-pub enum JsonToken<'a> {
+pub enum JsonToken {
     ObjectStart,
     ObjectEnd,
     ArrayStart,
     ArrayEnd,
     Colon,
     Comma,
-    Name(&'a str),
+    Name(String),
     Value(JsonType),
 }
 
@@ -20,8 +20,8 @@ pub enum JsonType {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Token<'a> {
+pub struct Token {
     pub line: usize,
     pub col: usize,
-    pub value: JsonToken<'a>,
+    pub value: JsonToken,
 }

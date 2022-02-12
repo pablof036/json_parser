@@ -29,7 +29,7 @@ pub struct Lexer<'a> {
     current_line: usize,
     current_line_str: Option<&'a str>,
     char_iter: Option<Peekable<Enumerate<Chars<'a>>>>,
-    tokens: Vec<Token<'a>>,
+    tokens: Vec<Token>,
 }
 
 impl<'a> Lexer<'a> {
@@ -215,7 +215,7 @@ impl<'a> Lexer<'a> {
 
                     self.tokens.push(
                         Token {
-                            value: JsonToken::Name(&current_line_str[start_index..=end_index]),
+                            value: JsonToken::Name(current_line_str[start_index..=end_index].to_owned()),
                             col: start_index,
                             line: self.current_line
                         }
@@ -275,7 +275,7 @@ impl<'a> Lexer<'a> {
     /// Consumes the structure and start the lexing process.
     /// # Returns
     /// Vec of Token structures.
-    pub fn start_lex(mut self) -> Vec<Token<'a>> {
+    pub fn start_lex(mut self) -> Vec<Token> {
         let mut step = self.lex_character();
         while step != NextStep::Done {
             match step {
@@ -300,7 +300,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        self.tokens
+       self.tokens
     }
 }
 
@@ -314,10 +314,10 @@ mod tests {
         let json = "{\"f1\": \"value\", \"f2\": true, \"f3\": 45.3, \"f4\": 12}";
 
         let expected_result = vec![
-            JsonToken::ObjectStart, JsonToken::Name("f1"), JsonToken::Colon, JsonToken::Value(JsonType::String),
-            JsonToken::Comma, JsonToken::Name("f2"), JsonToken::Colon, JsonToken::Value(JsonType::Bool),
-            JsonToken::Comma, JsonToken::Name("f3"), JsonToken::Colon, JsonToken::Value(JsonType::Float),
-            JsonToken::Comma, JsonToken::Name("f4"), JsonToken::Colon, JsonToken::Value(JsonType::Int),
+            JsonToken::ObjectStart, JsonToken::Name("f1".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::String),
+            JsonToken::Comma, JsonToken::Name("f2".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::Bool),
+            JsonToken::Comma, JsonToken::Name("f3".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::Float),
+            JsonToken::Comma, JsonToken::Name("f4".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::Int),
             JsonToken::ObjectEnd,
         ];
 
@@ -331,11 +331,11 @@ mod tests {
     fn array_object_json() {
         let json = "{\"f1\": {\"f2\": true, \"f3\": 45.3, \"f4\": 12}, \"f2\": [1, 2, 3]}";
         let expected_result = vec![
-            JsonToken::ObjectStart, JsonToken::Name("f1"), JsonToken::Colon, JsonToken::ObjectStart,
-            JsonToken::Name("f2"), JsonToken::Colon, JsonToken::Value(JsonType::Bool), JsonToken::Comma,
-            JsonToken::Name("f3"), JsonToken::Colon, JsonToken::Value(JsonType::Float), JsonToken::Comma,
-            JsonToken::Name("f4"), JsonToken::Colon, JsonToken::Value(JsonType::Int), JsonToken::ObjectEnd,
-            JsonToken::Comma, JsonToken::Name("f2"), JsonToken::Colon, JsonToken::ArrayStart,
+            JsonToken::ObjectStart, JsonToken::Name("f1".to_owned()), JsonToken::Colon, JsonToken::ObjectStart,
+            JsonToken::Name("f2".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::Bool), JsonToken::Comma,
+            JsonToken::Name("f3".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::Float), JsonToken::Comma,
+            JsonToken::Name("f4".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::Int), JsonToken::ObjectEnd,
+            JsonToken::Comma, JsonToken::Name("f2".to_owned()), JsonToken::Colon, JsonToken::ArrayStart,
             JsonToken::Value(JsonType::Int), JsonToken::Comma, JsonToken::Value(JsonType::Int), JsonToken::Comma,
             JsonToken::Value(JsonType::Int), JsonToken::ArrayEnd, JsonToken::ObjectEnd
         ];
@@ -397,7 +397,7 @@ mod tests {
         let json = ",\"hola\"";
         let expected_result = vec![
             JsonToken::Comma,
-            JsonToken::Name("hola")
+            JsonToken::Name("hola".to_owned())
         ];
 
         let lexer = Lexer::new(json);
@@ -440,8 +440,8 @@ mod tests {
         let json = "{\"2\":\"aº\", \"ab\": 32}";
 
         let expected_result = vec![
-            JsonToken::ObjectStart, JsonToken::Name("2"), JsonToken::Colon,
-            JsonToken::Value(JsonType::String), JsonToken::Comma, JsonToken::Name("ab"),
+            JsonToken::ObjectStart, JsonToken::Name("2".to_owned()), JsonToken::Colon,
+            JsonToken::Value(JsonType::String), JsonToken::Comma, JsonToken::Name("ab".to_owned()),
             JsonToken::Colon, JsonToken::Value(JsonType::Int), JsonToken::ObjectEnd
         ];
 

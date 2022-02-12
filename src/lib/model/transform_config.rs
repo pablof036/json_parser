@@ -10,6 +10,18 @@ pub const RUST_DEFINITION: TransformConfig = TransformConfig {
     single_file: true
 };
 
+pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
+    type_definition: "class {object_name} {",
+    field_definition: "\tprivate final {field_type} {field_name};",
+    array_definition: "{field_type}[]",
+    block_end: "}",
+    int_type: "int",
+    float_type: "double",
+    bool_type: "boolean",
+    string_type: "String",
+    single_file: true
+};
+
 pub struct TransformConfig<'a> {
     pub type_definition: &'a str,
     pub field_definition: &'a str,

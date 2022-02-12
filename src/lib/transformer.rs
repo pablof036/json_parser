@@ -3,15 +3,8 @@ use crate::lib::model::transform_config::TransformConfig;
 use crate::lib::model::tree::JsonTree;
 use thiserror::Error;
 
-pub struct Transformer<'a> {
-    name: Option<&'a str>,
-    config: TransformConfig<'a>,
-    tree: &'a Vec<JsonTree<'a>>,
-    output: Vec<Vec<String>>,
-}
-
 #[derive(Error, Debug)]
-enum TransformerError<'a> {
+pub enum TransformerError<'a> {
     #[error("Bad type definition in config: {{name}} needed.\n{0}")]
     BadTypeDefinition(&'a str),
     #[error("Bad field definition in config: {{field_name}} needed.\n{0}")]
@@ -22,8 +15,15 @@ enum TransformerError<'a> {
     BadArrayTypeDefinition(&'a str),
 }
 
+pub struct Transformer<'a> {
+    name: Option<&'a str>,
+    config: TransformConfig<'a>,
+    tree: Vec<JsonTree>,
+    output: Vec<Vec<String>>,
+}
+
 impl<'a> Transformer<'a> {
-    pub fn new(config: TransformConfig<'a>, tree: &'a JsonTree, name: Option<&'a str>) -> Result<Self, TransformerError<'a>> {
+    pub fn new(config: TransformConfig<'a>, tree: Vec<JsonTree>, name: Option<&'a str>) -> Result<Self, TransformerError<'a>> {
         let field_str = config.field_definition;
         let array_type_str = config.array_definition;
         let type_str = config.type_definition;
@@ -41,15 +41,8 @@ impl<'a> Transformer<'a> {
         }
 
         if !array_type_str.contains("{field_type}") {
-            return Err(TransformerError::BadArrayTypeDefinition(field_str));
+            return Err(TransformerError::BadArrayTypeDefinition(array_type_str));
         }
-
-        let tree = match tree {
-            JsonTree::Root(tree) => {
-                tree
-            },
-            _ => panic!("Root not provided to transformer")
-        };
 
         Ok(Self {
             name,
@@ -59,18 +52,17 @@ impl<'a> Transformer<'a> {
         })
     }
 
-    fn transform_object(&mut self, tree: &Vec<JsonTree<'a>>, name: &'a str) {
+    fn transform_object(&mut self, tree: Vec<JsonTree>, name: String) {
         let mut object: Vec<String> = Vec::new();
 
-        object.push(self.config.type_definition.replace("{object_name}", name));
+        object.push(self.config.type_definition.replace("{object_name}", &name));
 
-        let mut tree = tree.iter();
+        let mut tree = tree.into_iter();
         while let Some(item) = tree.next() {
-            object.push(self.parse_tree(item));
+            object.push(self.parse_tree(&item));
             if let JsonTree::JsonObject(name, object) = item {
                 self.transform_object(object, name);
             }
-
         }
 
         object.push(self.config.block_end.to_owned());
@@ -101,20 +93,19 @@ impl<'a> Transformer<'a> {
             }
             JsonTree::JsonObject(name, _) => {
                 let with_name = field_str.replace("{field_name}", name);
-               with_name.replace("{field_type}", name)
+                with_name.replace("{field_type}", name)
             }
             JsonTree::JsonArray(name, _) => {
                 let with_name = field_str.replace("{field_name}", name);
                 let with_array_type = with_name.replace("{field_type}", array_type_str);
                 with_array_type.replace("{field_type}", name)
             }
-            JsonTree::Root(_) => panic!("this should not happen here"),
         }
     }
 
     pub fn start_transform(mut self) -> Vec<Vec<String>> {
-        let tree = mem::replace(&mut self.tree, &Vec::new());
-        self.transform_object(&tree, self.name.unwrap_or_else(|| "Root"));
+        let tree = mem::replace(&mut self.tree, Vec::new());
+        self.transform_object(tree, self.name.unwrap_or_else(|| "Root").to_owned());
         self.output
     }
 }
@@ -123,7 +114,6 @@ impl<'a> Transformer<'a> {
 #[cfg(test)]
 mod tests {
     use crate::lib::model::transform_config::{RUST_DEFINITION, TransformConfig};
-    use crate::lib::model::tree::JsonTree;
     use crate::lib::parser::lexer::Lexer;
     use crate::lib::parser::tokenizer::Tokenizer;
     use crate::lib::transformer::Transformer;
@@ -144,7 +134,7 @@ mod tests {
 
         let lexer = Lexer::new(json);
         let tokenizer = Tokenizer::new(lexer.start_lex());
-        let transformer = Transformer::new(RUST_DEFINITION, &tokenizer.start_tokenizer().unwrap(), None).unwrap();
+        let transformer = Transformer::new(RUST_DEFINITION, tokenizer.start_tokenizer().unwrap(), None).unwrap();
         let result = transformer.start_transform();
 
         assert_eq!(result, expected_result);
@@ -192,7 +182,6 @@ mod tests {
             single_file: true,
         };
 
-        let transformer = Transformer::new(bad_config, & cvJsonTree::Root(vec![]), None).unwrap();
-        transformer.parse_tree(&JsonTree::Root(vec![]));
+        Transformer::new(bad_config, vec![], None).unwrap();
     }
 }

@@ -1,5 +1,5 @@
 use std::fs;
-use crate::lib::model::transform_config::RUST_DEFINITION;
+use crate::lib::model::transform_config::{JAVA_DEFINITION, RUST_DEFINITION};
 use crate::lib::parser::lexer::Lexer;
 use crate::lib::parser::tokenizer::Tokenizer;
 use crate::lib::transformer::Transformer;
@@ -11,14 +11,18 @@ mod transformer;
 pub fn run(filename: String) -> anyhow::Result<()> {
     let file = fs::read_to_string(filename)?;
 
+
     let lexer = Lexer::new(&file);
     let lexer_result = lexer.start_lex();
     let token = Tokenizer::new(lexer_result);
     let tokenizer_result = token.start_tokenizer()?;
-    let transformer = Transformer::new(RUST_DEFINITION, tokenizer_result, None)?;
+    let transformer = Transformer::new(JAVA_DEFINITION, tokenizer_result, None)?;
     let result = transformer.start_transform();
 
-    println!("{:#?}", result);
+    result.iter().rev().for_each(|object| object.iter().for_each(|string| {
+       println!("{}", string)
+    }));
+
 
     Ok(())
 }

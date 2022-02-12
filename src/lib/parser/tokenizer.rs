@@ -6,7 +6,7 @@ use crate::lib::model::token::{JsonToken, JsonType, Token};
 use crate::lib::parser::tokenizer::TokenizerError::{NullNotSupportedError, SyntaxError};
 
 #[derive(Error, Debug)]
-enum TokenizerError  {
+enum TokenizerError {
     #[error("syntax error detected near line {0} column {1}")]
     SyntaxError(usize, usize),
     #[error("unknown syntax error")]
@@ -18,18 +18,18 @@ enum TokenizerError  {
 }
 
 #[derive(Debug)]
-pub struct Tokenizer<'a> {
-    token_iter: Peekable<Enumerate<IntoIter<Token<'a>>>>,
+pub struct Tokenizer {
+    token_iter: Peekable<Enumerate<IntoIter<Token>>>,
 }
 
-impl<'a> Tokenizer<'a> {
-    pub fn new(tokens: Vec<Token<'a>>) -> Self {
+impl Tokenizer {
+    pub fn new(tokens: Vec<Token>) -> Self {
         Self {
             token_iter: tokens.into_iter().enumerate().peekable(),
         }
     }
 
-    fn parse_new_array_type(old_type: Option<JsonArrayType<'a>>, new_type: JsonArrayType<'a>, line: usize, col: usize) -> Result<JsonArrayType<'a>, TokenizerError> {
+    fn parse_new_array_type(old_type: Option<JsonArrayType>, new_type: JsonArrayType, line: usize, col: usize) -> Result<JsonArrayType, TokenizerError> {
         if let Some(old_type) = old_type {
             if old_type == new_type {
                 return Ok(new_type);
@@ -38,9 +38,9 @@ impl<'a> Tokenizer<'a> {
             if let JsonArrayType::JsonObject(mut old_tree) = old_type {
                 if let JsonArrayType::JsonObject(new_tree) = new_type {
                     new_tree.into_iter().for_each(|json_type| {
-                       if !old_tree.contains(&json_type) {
-                           old_tree.push(json_type)
-                       }
+                        if !old_tree.contains(&json_type) {
+                            old_tree.push(json_type)
+                        }
                     });
 
                     return Ok(JsonArrayType::JsonObject(old_tree));
@@ -55,7 +55,7 @@ impl<'a> Tokenizer<'a> {
         Ok(new_type)
     }
 
-    fn parse_array_token(&mut self, name: &'a str) -> Result<JsonTree<'a>, TokenizerError> {
+    fn parse_array_token(&mut self, name: String) -> Result<JsonTree, TokenizerError> {
         let mut array_type = None;
 
         while let Some((_, token)) = self.token_iter.next() {
@@ -66,9 +66,9 @@ impl<'a> Tokenizer<'a> {
                     }
 
                     return Err(TokenizerError::EmptyArrayNotSupportedError(token.line, token.col));
-                },
+                }
                 JsonToken::ArrayStart => {
-                    let deeper_array = self.parse_array_token("")?;
+                    let deeper_array = self.parse_array_token(String::new())?;
                     if let JsonTree::JsonArray(_, deeper_array_type) = deeper_array {
                         let deeper_array_type = JsonArrayType::JsonArray(Box::new(deeper_array_type));
                         array_type = Some(Self::parse_new_array_type(array_type, deeper_array_type, token.line, token.col)?);
@@ -80,7 +80,7 @@ impl<'a> Tokenizer<'a> {
                     let object = self.parse_object_token()?;
                     let new_type = JsonArrayType::JsonObject(object);
                     array_type = Some(Self::parse_new_array_type(array_type, new_type, token.line, token.col)?);
-                },
+                }
                 JsonToken::Value(json_type) => {
                     let value_type;
                     match json_type {
@@ -91,7 +91,7 @@ impl<'a> Tokenizer<'a> {
                         JsonType::Null => return Err(NullNotSupportedError(token.line, token.col)),
                     }
                     array_type = Some(Self::parse_new_array_type(array_type, value_type, token.line, token.col)?);
-                },
+                }
                 JsonToken::Comma => (),
                 _ => {
                     return Err(TokenizerError::SyntaxError(token.line, token.col));
@@ -106,7 +106,7 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    fn parse_object_token(&mut self) -> Result<Vec<JsonTree<'a>>, TokenizerError> {
+    fn parse_object_token(&mut self) -> Result<Vec<JsonTree>, TokenizerError> {
         let mut object = Vec::new();
         let mut name = None;
         let mut actual_count = 0;
@@ -172,8 +172,8 @@ impl<'a> Tokenizer<'a> {
         Ok(object)
     }
 
-    pub fn start_tokenizer(mut self) -> anyhow::Result<JsonTree<'a>> {
-        Ok(JsonTree::Root(self.parse_object_token()?))
+    pub fn start_tokenizer(mut self) -> anyhow::Result<Vec<JsonTree>> {
+        Ok(self.parse_object_token()?)
     }
 }
 
@@ -196,12 +196,12 @@ mod tests {
     #[test]
     fn simple_json() {
         let json = "{\"f1\": \"value\", \"f2\": true, \"f3\": 45.3, \"f4\": 12}";
-        let expected_result = JsonTree::Root(vec![
-            JsonTree::String("f1"),
-            JsonTree::Bool("f2"),
-            JsonTree::Float("f3"),
-            JsonTree::Int("f4"),
-        ]);
+        let expected_result = vec![
+            JsonTree::String("f1".to_owned()),
+            JsonTree::Bool("f2".to_owned()),
+            JsonTree::Float("f3".to_owned()),
+            JsonTree::Int("f4".to_owned()),
+        ];
 
         let lexer = Lexer::new(json);
         let lexer_result = lexer.start_lex();
@@ -215,20 +215,18 @@ mod tests {
     fn nested_json_object() {
         let json = "{\"f1\": \"value\", \"f2\": true, \"f3\": { \"f4\": 45.3, \"f5\": {\"f6\": true, \"f7\":\"aº\"}}, \"a\": 32}";
 
-        let expected_result = JsonTree::Root(
-            vec![
-                JsonTree::String("f1"),
-                JsonTree::Bool("f2"),
-                JsonTree::JsonObject("f3", vec![
-                    JsonTree::Float("f4"),
-                    JsonTree::JsonObject("f5", vec![
-                        JsonTree::Bool("f6"),
-                        JsonTree::String("f7"),
-                    ]),
+        let expected_result = vec![
+            JsonTree::String("f1".to_owned()),
+            JsonTree::Bool("f2".to_owned()),
+            JsonTree::JsonObject("f3".to_owned(), vec![
+                JsonTree::Float("f4".to_owned()),
+                JsonTree::JsonObject("f5".to_owned(), vec![
+                    JsonTree::Bool("f6".to_owned()),
+                    JsonTree::String("f7".to_owned()),
                 ]),
-                JsonTree::Int("a")
-            ]
-        );
+            ]),
+            JsonTree::Int("a".to_owned()),
+        ];
 
         let lexer = Lexer::new(json);
         let lexer_result = lexer.start_lex();
@@ -242,11 +240,9 @@ mod tests {
     fn simple_array() {
         let json = "{\"f1\": [5, 3, 2, 1]}";
 
-        let expected_result = JsonTree::Root(
-            vec![
-                JsonTree::JsonArray("f1", JsonArrayType::Int)
-            ]
-        );
+        let expected_result = vec![
+            JsonTree::JsonArray("f1".to_owned(), JsonArrayType::Int)
+        ];
 
         let lexer = Lexer::new(json);
         let lexer_result = lexer.start_lex();
@@ -261,11 +257,10 @@ mod tests {
     fn nested_array() {
         let json = "{\"f1\": [[5, 3], [2, 1]]}";
 
-        let expected_result = JsonTree::Root(
-            vec![
-                JsonTree::JsonArray("f1", JsonArrayType::JsonArray(Box::new(JsonArrayType::Int)))
-            ]
-        );
+        let expected_result = vec![
+            JsonTree::JsonArray("f1".to_owned(), JsonArrayType::JsonArray(Box::new(JsonArrayType::Int)))
+        ];
+
 
         let lexer = Lexer::new(json);
         let lexer_result = lexer.start_lex();
@@ -290,16 +285,14 @@ mod tests {
     fn array_with_object() {
         let json = "{\"f1\": [{\"f2\": 432, \"f3\": true}]}";
 
-        let expected_result = JsonTree::Root(
-            vec![
-                JsonTree::JsonArray("f1", JsonArrayType::JsonObject(
-                    vec![
-                        JsonTree::Int("f2"),
-                        JsonTree::Bool("f3")
-                    ]
-                ))
-            ]
-        );
+        let expected_result = vec![
+            JsonTree::JsonArray("f1".to_owned(), JsonArrayType::JsonObject(
+                vec![
+                    JsonTree::Int("f2".to_owned()),
+                    JsonTree::Bool("f3".to_owned()),
+                ]
+            ))
+        ];
 
         let lexer = Lexer::new(json);
         let lexer_result = lexer.start_lex();
@@ -312,17 +305,16 @@ mod tests {
     #[test]
     fn array_object_adding() {
         let json = "{\"f1\": [{\"f2\": 432, \"f3\": true}, {\"f4\": 43.2}]}";
-        let expected_result = JsonTree::Root(
-            vec![
-                JsonTree::JsonArray("f1", JsonArrayType::JsonObject(
-                    vec![
-                        JsonTree::Int("f2"),
-                        JsonTree::Bool("f3"),
-                        JsonTree::Float("f4")
-                    ]
-                ))
-            ]
-        );
+        let expected_result = vec![
+            JsonTree::JsonArray("f1".to_owned(), JsonArrayType::JsonObject(
+                vec![
+                    JsonTree::Int("f2".to_owned()),
+                    JsonTree::Bool("f3".to_owned()),
+                    JsonTree::Float("f4".to_owned()),
+                ]
+            ))
+        ];
+
 
         let lexer = Lexer::new(json);
         let lexer_result = lexer.start_lex();
@@ -352,7 +344,4 @@ mod tests {
         let tokenizer = Tokenizer::new(lexer_result);
         tokenizer.start_tokenizer().unwrap();
     }
-
-
-
 }
