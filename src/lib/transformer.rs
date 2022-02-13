@@ -1,6 +1,6 @@
 use std::mem;
 use crate::lib::model::transform_config::TransformConfig;
-use crate::lib::model::tree::JsonTree;
+use crate::lib::model::tree::{JsonArrayType, JsonTree};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,7 +13,16 @@ pub enum TransformerError<'a> {
     BadFieldDefinitionType(&'a str),
     #[error("Bad array type definition in config: {{field_type}} needed. \n {0}")]
     BadArrayTypeDefinition(&'a str),
+    #[error("Bad constructor definition: {{object_name}} needed.\n {0}")]
+    BadConstructorDefinitionName(&'a str),
+    #[error("Bad constructor definition: {{arguments}} needed.\n {0}")]
+    BadConstructorDefinitionArgument(&'a str),
+    #[error("Bad argument definition: {{name}} needed.\n {0}")]
+    BadArgumentDefinitionName(&'a str),
+    #[error("Bad constructor field definition: {{name}} needed.\n {0}")]
+    BadConstructorFieldDefinition(&'a str),
 }
+
 
 pub struct Transformer<'a> {
     name: Option<&'a str>,
@@ -44,6 +53,29 @@ impl<'a> Transformer<'a> {
             return Err(TransformerError::BadArrayTypeDefinition(array_type_str));
         }
 
+        if let Some(ref constructor) = config.constructor {
+            let constructor_str = constructor.definition;
+            let argument_str = constructor.argument_definition;
+
+            if !constructor_str.contains("{object_name}") {
+                return Err(TransformerError::BadConstructorDefinitionName(constructor_str));
+            }
+
+            if !constructor_str.contains("{arguments}") {
+                return Err(TransformerError::BadConstructorDefinitionArgument(constructor_str));
+            }
+
+            if !argument_str.contains("{name}") {
+                return Err(TransformerError::BadArgumentDefinitionName(argument_str));
+            }
+
+            if let Some(ref field) = constructor.field_definition {
+                if !field.field_definition.contains("{name}") {
+                    return Err(TransformerError::BadConstructorFieldDefinition(field.field_definition));
+                }
+            }
+        }
+
         Ok(Self {
             name,
             config,
@@ -52,16 +84,55 @@ impl<'a> Transformer<'a> {
         })
     }
 
-    fn transform_object(&mut self, tree: Vec<JsonTree>, name: String) {
+    fn transform_object(&mut self, tree: &Vec<JsonTree>, name: String) {
         let mut object: Vec<String> = Vec::new();
 
         object.push(self.config.type_definition.replace("{object_name}", &name));
 
-        let mut tree = tree.into_iter();
-        while let Some(item) = tree.next() {
-            object.push(self.parse_tree(&item));
-            if let JsonTree::JsonObject(name, object) = item {
-                self.transform_object(object, name);
+        let fields: Vec<(String, &String)> = tree.iter().map(|tree| match tree {
+            JsonTree::Int(name) => (self.config.int_type.to_owned(), name),
+            JsonTree::Float(name) => (self.config.float_type.to_owned(), name),
+            JsonTree::String(name) => (self.config.string_type.to_owned(), name),
+            JsonTree::Bool(name) => (self.config.bool_type.to_owned(), name),
+            JsonTree::JsonObject(name, tree) => {
+                self.transform_object(tree, name.to_owned());
+                (name.clone(), name)
+            },
+            JsonTree::JsonArray(name, array_type) => {
+                if let JsonArrayType::JsonObject(tree) = array_type {
+                    self.transform_object(tree, name.to_owned());
+                }
+                let array_str = self.config.array_definition.replace("{field_type}", name);
+                (array_str, name)
+            }
+        }).collect();
+
+        for (type_str, name) in &fields {
+            let with_name = self.config.field_definition.replace("{field_name}", name);
+            object.push(with_name.replace("{field_type}", &type_str));
+        }
+
+
+        if let Some(ref constructor) = self.config.constructor {
+            let mut arguments_str = String::new();
+            for (i, (type_str, name)) in fields.iter().enumerate() {
+                let with_type = constructor.argument_definition.replace("{type}", type_str);
+                let with_name = with_type.replace("{name}", name);
+                if i < fields.len() - 1 || (i == fields.len() - 1 && constructor.separator_at_end) {
+                    arguments_str.push_str(&*(with_name + constructor.separator));
+                } else {
+                    arguments_str.push_str(&with_name);
+                }
+            }
+
+            let with_name = constructor.definition.replace("{object_name}", &name);
+            object.push(with_name.replace("{arguments}", &arguments_str));
+
+            if let Some(ref field) = constructor.field_definition {
+                for (_, name) in fields {
+                    object.push(field.field_definition.replace("{name}", name));
+                }
+                object.push(field.end.to_owned());
             }
         }
 
@@ -70,42 +141,9 @@ impl<'a> Transformer<'a> {
         self.output.push(object);
     }
 
-    fn parse_tree(&self, tree: &JsonTree) -> String {
-        let field_str = self.config.field_definition;
-        let array_type_str = self.config.array_definition;
-
-        match tree {
-            JsonTree::Int(name) => {
-                let with_name = field_str.replace("{field_name}", name);
-                with_name.replace("{field_type}", self.config.int_type)
-            }
-            JsonTree::Float(name) => {
-                let with_name = field_str.replace("{field_name}", name);
-                with_name.replace("{field_type}", self.config.float_type)
-            }
-            JsonTree::String(name) => {
-                let with_name = field_str.replace("{field_name}", name);
-                with_name.replace("{field_type}", self.config.string_type)
-            }
-            JsonTree::Bool(name) => {
-                let with_name = field_str.replace("{field_name}", name);
-                with_name.replace("{field_type}", self.config.bool_type)
-            }
-            JsonTree::JsonObject(name, _) => {
-                let with_name = field_str.replace("{field_name}", name);
-                with_name.replace("{field_type}", name)
-            }
-            JsonTree::JsonArray(name, _) => {
-                let with_name = field_str.replace("{field_name}", name);
-                let with_array_type = with_name.replace("{field_type}", array_type_str);
-                with_array_type.replace("{field_type}", name)
-            }
-        }
-    }
-
     pub fn start_transform(mut self) -> Vec<Vec<String>> {
         let tree = mem::replace(&mut self.tree, Vec::new());
-        self.transform_object(tree, self.name.unwrap_or_else(|| "Root").to_owned());
+        self.transform_object(&tree, self.name.unwrap_or_else(|| "Root").to_owned());
         self.output
     }
 }
@@ -179,7 +217,7 @@ mod tests {
             float_type: "f32",
             bool_type: "bool",
             string_type: "String",
-            single_file: true,
+            constructor: None
         };
 
         Transformer::new(bad_config, vec![], None).unwrap();

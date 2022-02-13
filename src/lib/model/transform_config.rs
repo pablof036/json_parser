@@ -7,7 +7,7 @@ pub const RUST_DEFINITION: TransformConfig = TransformConfig {
     float_type: "f32",
     bool_type: "bool",
     string_type: "String",
-    single_file: true
+    constructor: None
 };
 
 pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
@@ -19,7 +19,37 @@ pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
     float_type: "double",
     bool_type: "boolean",
     string_type: "String",
-    single_file: true
+    constructor: Some(
+        ConstructorConfig {
+            definition: "\tpublic {object_name}({arguments}) {",
+            argument_definition: "{type} {name}",
+            separator: ", ",
+            separator_at_end: false,
+            field_definition: Some(ConstructorField{
+                field_definition: "\t\tthis.{name} = {name};",
+                end: "\t}"
+            })
+        }
+    )
+};
+
+pub const DART_DEFINITION: TransformConfig = TransformConfig {
+    type_definition: "class {object_name} {",
+    field_definition: "\tfinal {field_type}? {field_name};",
+    array_definition: "List<{field_type}>",
+    block_end: "}",
+    int_type: "int",
+    float_type: "double",
+    bool_type: "bool",
+    string_type: "String",
+    constructor: Some(
+        ConstructorConfig {
+        definition: "\t{object_name}({{arguments}\n\t});",
+        argument_definition: "\n\t\tthis.{name}",
+        separator: ", ",
+        separator_at_end: true,
+        field_definition: None,
+    })
 };
 
 pub struct TransformConfig<'a> {
@@ -31,5 +61,18 @@ pub struct TransformConfig<'a> {
     pub float_type: &'a str,
     pub bool_type: &'a str,
     pub string_type: &'a str,
-    pub single_file: bool,
+    pub constructor: Option<ConstructorConfig<'a>>
+}
+
+pub struct ConstructorConfig<'a> {
+    pub definition: &'a str,
+    pub argument_definition: &'a str,
+    pub separator: &'a str,
+    pub separator_at_end: bool,
+    pub field_definition: Option<ConstructorField<'a>>,
+}
+
+pub struct ConstructorField<'a> {
+    pub field_definition: &'a str,
+    pub end: &'a str,
 }
