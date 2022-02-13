@@ -13,6 +13,8 @@ pub enum TransformerError<'a> {
     BadFieldDefinitionName(&'a str),
     #[error("Bad field definition in config: {{field_type}} needed. \n{0}")]
     BadFieldDefinitionType(&'a str),
+    #[error("Bad field rename definition in config: {{name}} needed. \n{0}")]
+    BadFieldRenameDefinition(&'a str),
     #[error("Bad array type definition in config: {{field_type}} needed. \n {0}")]
     BadArrayTypeDefinition(&'a str),
     #[error("Bad constructor definition: {{object_name}} needed.\n {0}")]
@@ -42,6 +44,7 @@ struct FieldInfo<'a> {
 impl<'a> Transformer<'a> {
     pub fn new(config: TransformConfig<'a>, tree: Vec<JsonTree>, name: Option<&'a str>) -> Result<Self, TransformerError<'a>> {
         let field_str = config.field_definition;
+        let field_rename_str = config.name_change_annotation;
         let array_type_str = config.array_definition;
         let type_str = config.type_definition;
 
@@ -51,6 +54,10 @@ impl<'a> Transformer<'a> {
 
         if !field_str.contains("{field_name}") {
             return Err(TransformerError::BadFieldDefinitionName(field_str));
+        }
+
+        if !field_rename_str.contains("{name}") {
+            return Err(TransformerError::BadFieldRenameDefinition(type_str));
         }
 
         if !field_str.contains("{field_type}") {
@@ -147,7 +154,13 @@ impl<'a> Transformer<'a> {
         }).collect();
 
 
-        for (i, field_info) in fields.iter().enumerate() {
+        for field_info in fields.iter() {
+
+            if field_info.case_str != field_info.original_str {
+                let with_name = self.config.name_change_annotation.replace("{name}", field_info.original_str);
+                object.push(with_name);
+            }
+
             let with_name = self.config.field_definition.replace("{field_name}", &field_info.case_str);
             object.push(with_name.replace("{field_type}", &field_info.type_str));
         }
@@ -251,6 +264,7 @@ mod tests {
         let bad_config = TransformConfig {
             type_definition: "{nn}",
             field_definition: "\t{field_ame}: {field_ype}",
+            name_change_annotation: "a",
             array_definition: "Vec<{field_type}>",
             block_end: "}",
             int_type: "i32",

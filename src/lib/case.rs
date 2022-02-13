@@ -38,8 +38,9 @@ pub fn convert_case(str: &str, case_type: &CaseType) -> String {
                     }
                     CaseType::CamelCase | CaseType::UpperCamelCase  => {
                         if i != 0 {
-                            result.remove(i);
-                            result[i..=i].make_ascii_uppercase();
+                            let index = result.find(char).unwrap();
+                            result.remove(index);
+                            result[index..=index].make_ascii_uppercase();
                         }
                     },
                 }
@@ -106,6 +107,15 @@ mod tests {
         let str = "ho-la";
         let expected_result = String::from("ho_la");
         let result = convert_case(str, &CaseType::SnakeCase);
+
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn multiple_snake_to_camel() {
+        let str = "ho_la_eh";
+        let expected_result = String::from("hoLaEh");
+        let result = convert_case(str, &CaseType::CamelCase);
 
         assert_eq!(result, expected_result);
     }

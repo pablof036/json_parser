@@ -1,8 +1,9 @@
 use crate::lib::case::CaseType;
 
 pub const RUST_DEFINITION: TransformConfig = TransformConfig {
-    type_definition: "struct {object_name} {",
+    type_definition: "#[derive(Serialize, Deserialize, Debug)]\nstruct {object_name} {",
     field_definition: "\t{field_name}: {field_type},",
+    name_change_annotation: "\t#[serde(rename = \"{name}\")]",
     array_definition: "Vec<{field_type}>",
     block_end: "}",
     int_type: "i32",
@@ -17,6 +18,7 @@ pub const RUST_DEFINITION: TransformConfig = TransformConfig {
 pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
     type_definition: "class {object_name} {",
     field_definition: "\tprivate final {field_type} {field_name};",
+    name_change_annotation: "\t@SerializedName(value = \"{name}\")",
     array_definition: "{field_type}[]",
     block_end: "}",
     int_type: "int",
@@ -42,6 +44,7 @@ pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
 pub const DART_DEFINITION: TransformConfig = TransformConfig {
     type_definition: "class {object_name} {",
     field_definition: "\tfinal {field_type}? {field_name};",
+    name_change_annotation: "\t@JsonKey(name: '{name}')",
     array_definition: "List<{field_type}>",
     block_end: "}",
     int_type: "int",
@@ -60,9 +63,25 @@ pub const DART_DEFINITION: TransformConfig = TransformConfig {
     })
 };
 
+pub const KOTLIN_DEFINITION: TransformConfig = TransformConfig {
+    type_definition: "data class {object_name} (",
+    field_definition: "\tval {field_name}: {field_type},",
+    name_change_annotation: "\t@JsonKey(name: '{name}')",
+    array_definition: "{field_type}[]",
+    block_end: ");",
+    int_type: "int",
+    float_type: "double",
+    bool_type: "bool",
+    string_type: "String",
+    case_type: CaseType::CamelCase,
+    object_case_type: CaseType::UpperCamelCase,
+    constructor: None,
+};
+
 pub struct TransformConfig<'a> {
     pub type_definition: &'a str,
     pub field_definition: &'a str,
+    pub name_change_annotation: &'a str,
     pub array_definition: &'a str,
     pub block_end: &'a str,
     pub int_type: &'a str,
