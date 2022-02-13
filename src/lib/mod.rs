@@ -7,6 +7,7 @@ use crate::lib::transformer::Transformer;
 mod parser;
 mod model;
 mod transformer;
+mod case;
 
 pub fn run(filename: String) -> anyhow::Result<()> {
     let file = fs::read_to_string(filename)?;
@@ -16,7 +17,7 @@ pub fn run(filename: String) -> anyhow::Result<()> {
     let lexer_result = lexer.start_lex();
     let token = Tokenizer::new(lexer_result);
     let tokenizer_result = token.start_tokenizer()?;
-    let transformer = Transformer::new(JAVA_DEFINITION, tokenizer_result, None)?;
+    let transformer = Transformer::new(DART_DEFINITION, tokenizer_result, None)?;
     let result = transformer.start_transform();
 
     result.iter().rev().for_each(|object| object.iter().for_each(|string| {

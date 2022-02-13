@@ -1,3 +1,5 @@
+use crate::lib::case::CaseType;
+
 pub const RUST_DEFINITION: TransformConfig = TransformConfig {
     type_definition: "struct {object_name} {",
     field_definition: "\t{field_name}: {field_type},",
@@ -7,7 +9,9 @@ pub const RUST_DEFINITION: TransformConfig = TransformConfig {
     float_type: "f32",
     bool_type: "bool",
     string_type: "String",
-    constructor: None
+    constructor: None,
+    case_type: CaseType::SnakeCase,
+    object_case_type: CaseType::UpperCamelCase,
 };
 
 pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
@@ -19,6 +23,8 @@ pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
     float_type: "double",
     bool_type: "boolean",
     string_type: "String",
+    case_type: CaseType::CamelCase,
+    object_case_type: CaseType::UpperCamelCase,
     constructor: Some(
         ConstructorConfig {
             definition: "\tpublic {object_name}({arguments}) {",
@@ -30,7 +36,7 @@ pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
                 end: "\t}"
             })
         }
-    )
+    ),
 };
 
 pub const DART_DEFINITION: TransformConfig = TransformConfig {
@@ -42,6 +48,8 @@ pub const DART_DEFINITION: TransformConfig = TransformConfig {
     float_type: "double",
     bool_type: "bool",
     string_type: "String",
+    case_type: CaseType::CamelCase,
+    object_case_type: CaseType::UpperCamelCase,
     constructor: Some(
         ConstructorConfig {
         definition: "\t{object_name}({{arguments}\n\t});",
@@ -61,7 +69,9 @@ pub struct TransformConfig<'a> {
     pub float_type: &'a str,
     pub bool_type: &'a str,
     pub string_type: &'a str,
-    pub constructor: Option<ConstructorConfig<'a>>
+    pub constructor: Option<ConstructorConfig<'a>>,
+    pub case_type: CaseType,
+    pub object_case_type: CaseType,
 }
 
 pub struct ConstructorConfig<'a> {

@@ -2,6 +2,8 @@ use std::mem;
 use crate::lib::model::transform_config::TransformConfig;
 use crate::lib::model::tree::{JsonArrayType, JsonTree};
 use thiserror::Error;
+use crate::lib::case;
+use crate::lib::case::{CaseType, convert_case};
 
 #[derive(Error, Debug)]
 pub enum TransformerError<'a> {
@@ -29,6 +31,12 @@ pub struct Transformer<'a> {
     config: TransformConfig<'a>,
     tree: Vec<JsonTree>,
     output: Vec<Vec<String>>,
+}
+
+struct FieldInfo<'a> {
+    original_str: &'a str,
+    type_str: String,
+    case_str: String,
 }
 
 impl<'a> Transformer<'a> {
@@ -89,35 +97,66 @@ impl<'a> Transformer<'a> {
 
         object.push(self.config.type_definition.replace("{object_name}", &name));
 
-        let fields: Vec<(String, &String)> = tree.iter().map(|tree| match tree {
-            JsonTree::Int(name) => (self.config.int_type.to_owned(), name),
-            JsonTree::Float(name) => (self.config.float_type.to_owned(), name),
-            JsonTree::String(name) => (self.config.string_type.to_owned(), name),
-            JsonTree::Bool(name) => (self.config.bool_type.to_owned(), name),
+        let fields: Vec<FieldInfo> = tree.iter().map(|tree| match tree {
+            JsonTree::Int(name) => FieldInfo {
+                type_str: self.config.int_type.to_owned(),
+                original_str: name,
+                case_str: convert_case(name, &self.config.case_type)
+            },
+            JsonTree::Float(name) => FieldInfo {
+                type_str: self.config.float_type.to_owned(),
+                original_str: name,
+                case_str: convert_case(name, &self.config.case_type)
+            },
+            JsonTree::String(name) => FieldInfo {
+                type_str: self.config.string_type.to_owned(),
+                original_str: name,
+                case_str: convert_case(name, &self.config.case_type)
+            },
+            JsonTree::Bool(name) => FieldInfo {
+                type_str: self.config.bool_type.to_owned(),
+                original_str: name,
+                case_str: convert_case(name, &self.config.case_type)
+            },
             JsonTree::JsonObject(name, tree) => {
-                self.transform_object(tree, name.to_owned());
-                (name.clone(), name)
+                let case_str = convert_case(name, &self.config.case_type);
+                let type_str = convert_case(name, &self.config.object_case_type);
+                self.transform_object(tree, type_str.clone());
+                FieldInfo {
+                    type_str,
+                    original_str: name,
+                    case_str
+                }
             },
             JsonTree::JsonArray(name, array_type) => {
+                let case_str = convert_case(name, &self.config.case_type);
+                let mut array_str = self.config.array_definition.replace("{field_type}", &case_str);
+
                 if let JsonArrayType::JsonObject(tree) = array_type {
-                    self.transform_object(tree, name.to_owned());
+                    let type_str = convert_case(name, &self.config.object_case_type);
+                    self.transform_object(tree, type_str.clone());
+                    array_str = self.config.array_definition.replace("{field_type}", &type_str);
                 }
-                let array_str = self.config.array_definition.replace("{field_type}", name);
-                (array_str, name)
+
+                FieldInfo {
+                    type_str: array_str,
+                    original_str: name,
+                    case_str
+                }
             }
         }).collect();
 
-        for (type_str, name) in &fields {
-            let with_name = self.config.field_definition.replace("{field_name}", name);
-            object.push(with_name.replace("{field_type}", &type_str));
-        }
 
+        for (i, field_info) in fields.iter().enumerate() {
+            let with_name = self.config.field_definition.replace("{field_name}", &field_info.case_str);
+            object.push(with_name.replace("{field_type}", &field_info.type_str));
+        }
 
         if let Some(ref constructor) = self.config.constructor {
             let mut arguments_str = String::new();
-            for (i, (type_str, name)) in fields.iter().enumerate() {
-                let with_type = constructor.argument_definition.replace("{type}", type_str);
-                let with_name = with_type.replace("{name}", name);
+            for (i, field_info) in fields.iter().enumerate() {
+                let with_type = constructor.argument_definition.replace("{type}", &field_info.type_str);
+                let with_name = with_type.replace("{name}", &field_info.case_str);
                 if i < fields.len() - 1 || (i == fields.len() - 1 && constructor.separator_at_end) {
                     arguments_str.push_str(&*(with_name + constructor.separator));
                 } else {
@@ -129,8 +168,8 @@ impl<'a> Transformer<'a> {
             object.push(with_name.replace("{arguments}", &arguments_str));
 
             if let Some(ref field) = constructor.field_definition {
-                for (_, name) in fields {
-                    object.push(field.field_definition.replace("{name}", name));
+                for field_info in fields {
+                    object.push(field.field_definition.replace("{name}", &field_info.case_str));
                 }
                 object.push(field.end.to_owned());
             }
@@ -151,6 +190,7 @@ impl<'a> Transformer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::lib::case::CaseType;
     use crate::lib::model::transform_config::{RUST_DEFINITION, TransformConfig};
     use crate::lib::parser::lexer::Lexer;
     use crate::lib::parser::tokenizer::Tokenizer;
@@ -217,7 +257,9 @@ mod tests {
             float_type: "f32",
             bool_type: "bool",
             string_type: "String",
-            constructor: None
+            constructor: None,
+            case_type: CaseType::CamelCase,
+            object_case_type: CaseType::UpperCamelCase
         };
 
         Transformer::new(bad_config, vec![], None).unwrap();
