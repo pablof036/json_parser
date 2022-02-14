@@ -2,35 +2,34 @@ use std::mem;
 use crate::lib::model::transform_config::TransformConfig;
 use crate::lib::model::tree::{JsonArrayType, JsonTree};
 use thiserror::Error;
-use crate::lib::case;
-use crate::lib::case::{CaseType, convert_case};
+use crate::lib::case::{convert_case};
 
 #[derive(Error, Debug)]
-pub enum TransformerError<'a> {
+pub enum TransformerError {
     #[error("Bad type definition in config: {{name}} needed.\n{0}")]
-    BadTypeDefinition(&'a str),
+    BadTypeDefinition(String),
     #[error("Bad field definition in config: {{field_name}} needed.\n{0}")]
-    BadFieldDefinitionName(&'a str),
+    BadFieldDefinitionName(String),
     #[error("Bad field definition in config: {{field_type}} needed. \n{0}")]
-    BadFieldDefinitionType(&'a str),
+    BadFieldDefinitionType(String),
     #[error("Bad field rename definition in config: {{name}} needed. \n{0}")]
-    BadFieldRenameDefinition(&'a str),
+    BadFieldRenameDefinition(String),
     #[error("Bad array type definition in config: {{field_type}} needed. \n {0}")]
-    BadArrayTypeDefinition(&'a str),
+    BadArrayTypeDefinition(String),
     #[error("Bad constructor definition: {{object_name}} needed.\n {0}")]
-    BadConstructorDefinitionName(&'a str),
+    BadConstructorDefinitionName(String),
     #[error("Bad constructor definition: {{arguments}} needed.\n {0}")]
-    BadConstructorDefinitionArgument(&'a str),
+    BadConstructorDefinitionArgument(String),
     #[error("Bad argument definition: {{name}} needed.\n {0}")]
-    BadArgumentDefinitionName(&'a str),
+    BadArgumentDefinitionName(String),
     #[error("Bad constructor field definition: {{name}} needed.\n {0}")]
-    BadConstructorFieldDefinition(&'a str),
+    BadConstructorFieldDefinition(String),
 }
 
 
-pub struct Transformer<'a> {
-    name: Option<&'a str>,
-    config: TransformConfig<'a>,
+pub struct Transformer {
+    name: Option<String>,
+    config: TransformConfig,
     tree: Vec<JsonTree>,
     output: Vec<Vec<String>>,
 }
@@ -41,12 +40,12 @@ struct FieldInfo<'a> {
     case_str: String,
 }
 
-impl<'a> Transformer<'a> {
-    pub fn new(config: TransformConfig<'a>, tree: Vec<JsonTree>, name: Option<&'a str>) -> Result<Self, TransformerError<'a>> {
-        let field_str = config.field_definition;
-        let field_rename_str = config.name_change_annotation;
-        let array_type_str = config.array_definition;
-        let type_str = config.type_definition;
+impl Transformer {
+    pub fn new<'a>(config: TransformConfig, tree: Vec<JsonTree>, name: Option<String>) -> Result<Self, TransformerError> {
+        let field_str = config.field_definition.to_string();
+        let field_rename_str = config.name_change_annotation.to_string();
+        let array_type_str = config.array_definition.to_string();
+        let type_str = config.type_definition.to_string();
 
         if !type_str.contains("{object_name}") {
             return Err(TransformerError::BadTypeDefinition(type_str));
@@ -69,8 +68,8 @@ impl<'a> Transformer<'a> {
         }
 
         if let Some(ref constructor) = config.constructor {
-            let constructor_str = constructor.definition;
-            let argument_str = constructor.argument_definition;
+            let constructor_str = constructor.definition.to_string();
+            let argument_str = constructor.argument_definition.to_string();
 
             if !constructor_str.contains("{object_name}") {
                 return Err(TransformerError::BadConstructorDefinitionName(constructor_str));
@@ -86,7 +85,7 @@ impl<'a> Transformer<'a> {
 
             if let Some(ref field) = constructor.field_definition {
                 if !field.field_definition.contains("{name}") {
-                    return Err(TransformerError::BadConstructorFieldDefinition(field.field_definition));
+                    return Err(TransformerError::BadConstructorFieldDefinition(field.field_definition.to_string()));
                 }
             }
         }
@@ -106,22 +105,22 @@ impl<'a> Transformer<'a> {
 
         let fields: Vec<FieldInfo> = tree.iter().map(|tree| match tree {
             JsonTree::Int(name) => FieldInfo {
-                type_str: self.config.int_type.to_owned(),
+                type_str: self.config.int_type.to_string(),
                 original_str: name,
                 case_str: convert_case(name, &self.config.case_type)
             },
             JsonTree::Float(name) => FieldInfo {
-                type_str: self.config.float_type.to_owned(),
+                type_str: self.config.float_type.to_string(),
                 original_str: name,
                 case_str: convert_case(name, &self.config.case_type)
             },
             JsonTree::String(name) => FieldInfo {
-                type_str: self.config.string_type.to_owned(),
+                type_str: self.config.string_type.to_string(),
                 original_str: name,
                 case_str: convert_case(name, &self.config.case_type)
             },
             JsonTree::Bool(name) => FieldInfo {
-                type_str: self.config.bool_type.to_owned(),
+                type_str: self.config.bool_type.to_string(),
                 original_str: name,
                 case_str: convert_case(name, &self.config.case_type)
             },
@@ -171,7 +170,7 @@ impl<'a> Transformer<'a> {
                 let with_type = constructor.argument_definition.replace("{type}", &field_info.type_str);
                 let with_name = with_type.replace("{name}", &field_info.case_str);
                 if i < fields.len() - 1 || (i == fields.len() - 1 && constructor.separator_at_end) {
-                    arguments_str.push_str(&*(with_name + constructor.separator));
+                    arguments_str.push_str(&*(with_name + &constructor.separator));
                 } else {
                     arguments_str.push_str(&with_name);
                 }
@@ -184,18 +183,19 @@ impl<'a> Transformer<'a> {
                 for field_info in fields {
                     object.push(field.field_definition.replace("{name}", &field_info.case_str));
                 }
-                object.push(field.end.to_owned());
+                object.push(field.end.to_string());
             }
         }
 
-        object.push(self.config.block_end.to_owned());
+        object.push(self.config.block_end.to_string());
 
         self.output.push(object);
     }
 
     pub fn start_transform(mut self) -> Vec<Vec<String>> {
         let tree = mem::replace(&mut self.tree, Vec::new());
-        self.transform_object(&tree, self.name.unwrap_or_else(|| "Root").to_owned());
+        let name = self.name.clone().unwrap_or_else(|| String::from("Root"));
+        self.transform_object(&tree, name);
         self.output
     }
 }
@@ -203,6 +203,7 @@ impl<'a> Transformer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
     use crate::lib::case::CaseType;
     use crate::lib::model::transform_config::{RUST_DEFINITION, TransformConfig};
     use crate::lib::parser::lexer::Lexer;
@@ -262,15 +263,15 @@ mod tests {
     #[should_panic]
     fn fail_on_bad_config() {
         let bad_config = TransformConfig {
-            type_definition: "{nn}",
-            field_definition: "\t{field_ame}: {field_ype}",
-            name_change_annotation: "a",
-            array_definition: "Vec<{field_type}>",
-            block_end: "}",
-            int_type: "i32",
-            float_type: "f32",
-            bool_type: "bool",
-            string_type: "String",
+            type_definition: Cow::Borrowed("{nn}"),
+            field_definition: Cow::Borrowed("\t{field_ame}: {field_ype}"),
+            name_change_annotation: Cow::Borrowed("a"),
+            array_definition: Cow::Borrowed("Vec<{field_type}>"),
+            block_end: Cow::Borrowed("}"),
+            int_type: Cow::Borrowed("i32"),
+            float_type: Cow::Borrowed("f32"),
+            bool_type: Cow::Borrowed("bool"),
+            string_type: Cow::Borrowed("String"),
             constructor: None,
             case_type: CaseType::CamelCase,
             object_case_type: CaseType::UpperCamelCase

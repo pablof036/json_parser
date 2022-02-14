@@ -7,13 +7,13 @@ use crate::lib::parser::tokenizer::TokenizerError::{NullNotSupportedError, Synta
 
 #[derive(Error, Debug)]
 enum TokenizerError {
-    #[error("syntax error detected near line {0} column {1}")]
+    #[error("syntax error detected near line {} column {1}", .0 + 1)]
     SyntaxError(usize, usize),
     #[error("unknown syntax error")]
     UnknownSyntaxError,
-    #[error("null values are not supported. Near line {0} column {1}")]
+    #[error("null values are not supported. Near line {} column {1}", .0 + 1)]
     NullNotSupportedError(usize, usize),
-    #[error("empty arrays are not supported. Near line {0} column {1}")]
+    #[error("empty arrays are not supported. Near line {} column {1}", .0 + 1)]
     EmptyArrayNotSupportedError(usize, usize),
 }
 

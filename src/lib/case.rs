@@ -1,12 +1,4 @@
-use crate::lib::case::CaseType::UpperCamelCase;
-
-#[derive(Eq, PartialEq)]
-pub enum CaseType {
-    SnakeCase,
-    UpperCamelCase,
-    CamelCase
-}
-
+use crate::lib::model::transform_config::CaseType;
 
 pub fn convert_case(str: &str, case_type: &CaseType) -> String {
     let mut result = str.to_owned();
@@ -38,7 +30,8 @@ pub fn convert_case(str: &str, case_type: &CaseType) -> String {
                     }
                     CaseType::CamelCase | CaseType::UpperCamelCase  => {
                         if i != 0 {
-                            let index = result.find(char).unwrap();
+                            // Absolutely ugly way of ignoring the first char of the string (in case it is a '_').
+                            let index = result[1..].find(char).unwrap() + 1;
                             result.remove(index);
                             result[index..=index].make_ascii_uppercase();
                         }

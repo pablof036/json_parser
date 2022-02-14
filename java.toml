@@ -1,0 +1,22 @@
+field_definition = "\tprivate final {field_type} {field_name};"
+type_definition = "class {object_name} {"
+name_change_annotation = "\t@SerializedName(value = \"{name}\")"
+array_definition = "{field_type}[]"
+block_end = "}"
+int_type = "int"
+float_type = "float"
+bool_type = "boolean"
+string_type = "String"
+case_type = "CamelCase"
+object_case_type = "UpperCamelCase"
+
+[constructor]
+definition = "\t{object_name}({arguments}) {"
+argument_definition = "{type} {name}"
+separator = ", "
+separator_at_end = false
+
+[constructor.field_definition]
+field_definition = "\t\tthis.{name} = {name};"
+end = "\t}"
+
