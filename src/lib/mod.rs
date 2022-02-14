@@ -1,7 +1,8 @@
 use std::env::Args;
-use std::fs;
+use std::{fs, process};
 use std::path::Path;
 use anyhow::bail;
+use crate::HELP_MESSAGE;
 use crate::lib::model::transform_config::{DART_DEFINITION, JAVA_DEFINITION, KOTLIN_DEFINITION, RUST_DEFINITION, TransformConfig};
 use crate::lib::parser::lexer::Lexer;
 use crate::lib::parser::tokenizer::Tokenizer;
@@ -21,9 +22,26 @@ pub struct Config {
 
 impl Config {
     pub fn new(mut args: Args) -> anyhow::Result<Self> {
-        let definition_arg = args.find(|arg| {
-            arg.contains("--definition=")
+        let mut help = None;
+
+        let mut definition_arg = None;
+
+        let mut filename = None;
+
+        args.skip(1).for_each(|arg| {
+            if arg.contains("--definition") {
+                definition_arg = Some(arg)
+            } else if arg == "--help" {
+                help = Some(arg);
+            } else {
+                filename = Some(arg);
+            }
         });
+
+        if help.is_some() {
+            println!("{}", HELP_MESSAGE);
+            process::exit(0);
+        }
 
         let transformer_config = match definition_arg {
             Some(definition) => {
@@ -49,9 +67,9 @@ impl Config {
             None => bail!("definition not provided")
         };
 
-        let filename = match args.last() {
+        let filename = match filename {
             Some(filename) => filename,
-            None => bail!("Not enough arguments!")
+            _ => bail!("filename not provided")
         };
 
         Ok(
