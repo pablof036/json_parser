@@ -51,7 +51,7 @@ pub const DART_DEFINITION: TransformConfig = TransformConfig {
     int_type: Cow::Borrowed("int"),
     float_type: Cow::Borrowed("double"),
     bool_type: Cow::Borrowed("bool"),
-    string_type: Cow::Borrowed("Cow<'static, str>"),
+    string_type: Cow::Borrowed("String"),
     case_type: CaseType::CamelCase,
     object_case_type: CaseType::UpperCamelCase,
     constructor: Some(
