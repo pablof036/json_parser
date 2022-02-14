@@ -27,20 +27,38 @@ pub enum TransformerError {
 }
 
 
+/// Holds the data needed to turn a [JsonTree] into a representation provided by [TransformConfig].
 pub struct Transformer {
+    /// Name of the root object.
     name: Option<String>,
+    /// Wanted representation of the [JsonTree]
     config: TransformConfig,
+    /// Source tree
     tree: Vec<JsonTree>,
+    /// Output of the transformer.
+    /// Each vec represents an object, each String inside that vec represents a line.
     output: Vec<Vec<String>>,
 }
 
+/// Holds the type and name (maybe converted) of a field from [JsonTree] ready for writing into the output.
 struct FieldInfo<'a> {
+    ///In case the name is converted, `original_str` will be used in an annotation provided by [TransformConfig].
     original_str: &'a str,
+    ///Type of the field.
     type_str: String,
-    case_str: String,
+    ///Name string, could be converted.
+    name: String,
 }
 
 impl Transformer {
+
+    /// Creates a new [Transformer].
+    /// # Arguments
+    /// * `config` config for output. Will be checked for correctness.
+    /// * `tree` source json tree.
+    /// * `name` name of the root object
+    /// # Errors
+    /// If [TransformConfig] contains invalid data, a [TransformerError] will be returned.
     pub fn new<'a>(config: TransformConfig, tree: Vec<JsonTree>, name: Option<String>) -> Result<Self, TransformerError> {
         let field_str = config.field_definition.to_string();
         let field_rename_str = config.name_change_annotation.to_string();
@@ -98,6 +116,10 @@ impl Transformer {
         })
     }
 
+    /// Transforms an object of the tree.
+    /// # Arguments
+    /// * `tree` object source
+    /// * `name` of the object
     fn transform_object(&mut self, tree: &Vec<JsonTree>, name: String) {
         let mut object: Vec<String> = Vec::new();
 
@@ -107,22 +129,22 @@ impl Transformer {
             JsonTree::Int(name) => FieldInfo {
                 type_str: self.config.int_type.to_string(),
                 original_str: name,
-                case_str: convert_case(name, &self.config.case_type)
+                name: convert_case(name, &self.config.case_type)
             },
             JsonTree::Float(name) => FieldInfo {
                 type_str: self.config.float_type.to_string(),
                 original_str: name,
-                case_str: convert_case(name, &self.config.case_type)
+                name: convert_case(name, &self.config.case_type)
             },
             JsonTree::String(name) => FieldInfo {
                 type_str: self.config.string_type.to_string(),
                 original_str: name,
-                case_str: convert_case(name, &self.config.case_type)
+                name: convert_case(name, &self.config.case_type)
             },
             JsonTree::Bool(name) => FieldInfo {
                 type_str: self.config.bool_type.to_string(),
                 original_str: name,
-                case_str: convert_case(name, &self.config.case_type)
+                name: convert_case(name, &self.config.case_type)
             },
             JsonTree::JsonObject(name, tree) => {
                 let case_str = convert_case(name, &self.config.case_type);
@@ -131,7 +153,7 @@ impl Transformer {
                 FieldInfo {
                     type_str,
                     original_str: name,
-                    case_str
+                    name: case_str
                 }
             },
             JsonTree::JsonArray(name, array_type) => {
@@ -147,7 +169,7 @@ impl Transformer {
                 FieldInfo {
                     type_str: array_str,
                     original_str: name,
-                    case_str
+                    name: case_str
                 }
             }
         }).collect();
@@ -155,12 +177,12 @@ impl Transformer {
 
         for field_info in fields.iter() {
 
-            if field_info.case_str != field_info.original_str {
+            if field_info.name != field_info.original_str {
                 let with_name = self.config.name_change_annotation.replace("{name}", field_info.original_str);
                 object.push(with_name);
             }
 
-            let with_name = self.config.field_definition.replace("{field_name}", &field_info.case_str);
+            let with_name = self.config.field_definition.replace("{field_name}", &field_info.name);
             object.push(with_name.replace("{field_type}", &field_info.type_str));
         }
 
@@ -168,7 +190,7 @@ impl Transformer {
             let mut arguments_str = String::new();
             for (i, field_info) in fields.iter().enumerate() {
                 let with_type = constructor.argument_definition.replace("{type}", &field_info.type_str);
-                let with_name = with_type.replace("{name}", &field_info.case_str);
+                let with_name = with_type.replace("{name}", &field_info.name);
                 if i < fields.len() - 1 || (i == fields.len() - 1 && constructor.separator_at_end) {
                     arguments_str.push_str(&*(with_name + &constructor.separator));
                 } else {
@@ -181,7 +203,7 @@ impl Transformer {
 
             if let Some(ref field) = constructor.field_definition {
                 for field_info in fields {
-                    object.push(field.field_definition.replace("{name}", &field_info.case_str));
+                    object.push(field.field_definition.replace("{name}", &field_info.name));
                 }
                 object.push(field.end.to_string());
             }
@@ -192,6 +214,9 @@ impl Transformer {
         self.output.push(object);
     }
 
+    /// consumes the struct and start the transformation process.
+    /// # Returns
+    /// Struct's field `output`. Each vector represents an object, each object is made of a vector of lines.
     pub fn start_transform(mut self) -> Vec<Vec<String>> {
         let tree = mem::replace(&mut self.tree, Vec::new());
         let name = self.name.clone().unwrap_or_else(|| String::from("Root"));

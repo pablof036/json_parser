@@ -1,5 +1,12 @@
 use crate::lib::model::transform_config::CaseType;
 
+
+/// Converts between different case types.
+/// # Arguments
+/// * `str` string to convert
+/// * `case_type` case type to convert to. [CaseType]
+/// # Returns
+/// String in `case_type` case
 pub fn convert_case(str: &str, case_type: &CaseType) -> String {
     let mut result = str.to_owned();
 
