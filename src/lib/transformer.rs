@@ -204,7 +204,7 @@ impl Transformer {
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
-    use crate::lib::case::CaseType;
+    use crate::lib::model::transform_config::CaseType;
     use crate::lib::model::transform_config::{RUST_DEFINITION, TransformConfig};
     use crate::lib::parser::lexer::Lexer;
     use crate::lib::parser::tokenizer::Tokenizer;
@@ -215,7 +215,7 @@ mod tests {
         let json = "{\"f1\": \"value\", \"f2\": true, \"f3\": 45.3, \"f4\": 12}";
         let expected_result = vec![
             vec![
-                "struct Root {",
+                "#[derive(Serialize, Deserialize, Debug)]\nstruct Root {",
                 "\tf1: String,",
                 "\tf2: bool,",
                 "\tf3: f32,",
@@ -237,16 +237,16 @@ mod tests {
         let json = "{\"f1\": \"value\", \"f2\": true, \"f3\": 45.3, \"f4\": {\"f5\": true}}";
         let expected_result = vec![
             vec![
-                "struct f4 {",
+                "#[derive(Serialize, Deserialize, Debug)]\nstruct F4 {",
                 "\tf5: bool,",
                 "}",
             ],
             vec![
-                "struct Root {",
+                "#[derive(Serialize, Deserialize, Debug)]\nstruct Root {",
                 "\tf1: String,",
                 "\tf2: bool,",
                 "\tf3: f32,",
-                "\tf4: f4,",
+                "\tf4: F4,",
                 "}",
             ],
         ];

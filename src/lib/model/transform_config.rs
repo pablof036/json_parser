@@ -32,7 +32,7 @@ pub const JAVA_DEFINITION: TransformConfig = TransformConfig {
         ConstructorConfig {
             definition: Cow::Borrowed("\tpublic {object_name}({arguments}) {"),
             argument_definition: Cow::Borrowed("{type} {name}"),
-            separator: Cow::Borrowed("), "),
+            separator: Cow::Borrowed(", "),
             separator_at_end: false,
             field_definition: Some(ConstructorField{
                 field_definition: Cow::Borrowed("\t\tthis.{name} = {name};"),

@@ -12,7 +12,7 @@ enum NextStep {
     LexName,
     LexString,
     LexBooleanOrNull,
-    Done
+    Done,
 }
 
 
@@ -21,7 +21,7 @@ enum NextStep {
 enum NextLexStep {
     Done,
     Advance,
-    Skip
+    Skip,
 }
 
 pub struct Lexer<'a> {
@@ -33,7 +33,6 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-
     ///Creates a new lexer.
     /// # Parameters
     /// * `json` JSON String
@@ -85,10 +84,10 @@ impl<'a> Lexer<'a> {
                     }),
                     '0'..='9' => {
                         return NextStep::LexNumberType;
-                    },
+                    }
                     't' | 'f' | 'n' => {
                         return NextStep::LexBooleanOrNull;
-                    },
+                    }
                     '"' => {
                         if let Some(last_token) = &self.tokens.last() {
                             let last_added = &last_token.value;
@@ -108,10 +107,10 @@ impl<'a> Lexer<'a> {
             self.current_line_str = Some(line);
             self.char_iter = Some(line.chars().enumerate().peekable());
             self.current_line = i;
-            return NextStep::LexCharacter
+            return NextStep::LexCharacter;
         }
 
-        return NextStep::Done
+        return NextStep::Done;
     }
 
     /// Basic lexer for primitive types. Runs a closure which returns the next step for the lexer (advance the iterator, skip a character or end the lexer).
@@ -119,7 +118,7 @@ impl<'a> Lexer<'a> {
     /// * `f` - Closure which runs for each next characters. The iterator will be advanced (or not) depending of the returned value.
     /// # Returns
     /// Column of the first character of the token. For error message support.
-    fn lex<F: FnMut((&usize, &char)) -> NextLexStep>(&mut self, mut f: F) -> Option<usize>{
+    fn lex<F: FnMut((&usize, &char)) -> NextLexStep>(&mut self, mut f: F) -> Option<usize> {
         let mut token_start = None;
 
         if let Some(char_iter) = &mut self.char_iter {
@@ -131,11 +130,11 @@ impl<'a> Lexer<'a> {
                 match f((i, next_char)) {
                     NextLexStep::Advance => {
                         char_iter.next();
-                    },
+                    }
                     NextLexStep::Skip => {
                         char_iter.next();
                         char_iter.next();
-                    },
+                    }
                     NextLexStep::Done => break,
                 }
             }
@@ -153,7 +152,7 @@ impl<'a> Lexer<'a> {
                 'l' => {
                     is_null = true;
                     NextLexStep::Advance
-                },
+                }
                 's' => {
                     is_null = false;
                     NextLexStep::Advance
@@ -166,7 +165,7 @@ impl<'a> Lexer<'a> {
         if let Some(token_start) = token_start {
             self.tokens.push(
                 Token {
-                    value: JsonToken::Value(if is_null {JsonType::Null} else {JsonType::Bool}),
+                    value: JsonToken::Value(if is_null { JsonType::Null } else { JsonType::Bool }),
                     col: token_start,
                     line: self.current_line,
                 }
@@ -176,54 +175,34 @@ impl<'a> Lexer<'a> {
 
     /// Processes a field name.
     fn lex_name(&mut self) {
-
         let mut start_index = 0;
-        let mut end_index = 0;
-
-        let mut start_char = None;
-        let mut end_char = None;
+        let mut name = String::new();
 
         if let Some(char_iter) = &mut self.char_iter {
             while let Some((i, char)) = char_iter.next() {
+                if i == 0 {
+                    start_index = i;
+                }
                 if let Some((_, next_char)) = char_iter.peek() {
-                    if start_char == None {
-                        start_char = Some(char);
-                        start_index = i;
-                    }
+                    name.push(char);
 
                     if next_char == &'"' {
-                        end_char = Some(char);
-                        end_index = i;
-
-                        break
+                        break;
                     }
                 }
             }
         }
 
 
-        if let Some(start_char) = start_char {
-            if let Some(end_char) = end_char {
-                if let Some(current_line_str) = self.current_line_str {
-                    while current_line_str[start_index..=start_index] != start_char.to_string() {
-                        start_index += 1;
-                    }
-
-                    while current_line_str[end_index..=end_index] != end_char.to_string() {
-                        end_index += 1;
-                    }
-
-                    self.tokens.push(
-                        Token {
-                            value: JsonToken::Name(current_line_str[start_index..=end_index].to_owned()),
-                            col: start_index,
-                            line: self.current_line
-                        }
-                    )
-                }
+        self.tokens.push(
+            Token {
+                value: JsonToken::Name(name),
+                col: start_index,
+                line: self.current_line,
             }
-        }
+        )
     }
+
 
     /// Processes a String value.
     fn lex_string(&mut self) {
@@ -237,10 +216,10 @@ impl<'a> Lexer<'a> {
 
         if let Some(token_start) = token_start {
             self.tokens.push(
-                Token{
+                Token {
                     value: JsonToken::Value(JsonType::String),
                     line: self.current_line,
-                    col: token_start
+                    col: token_start,
                 }
             );
         }
@@ -256,7 +235,7 @@ impl<'a> Lexer<'a> {
                 '.' => {
                     is_float = true;
                     return NextLexStep::Advance;
-                },
+                }
                 _ => NextLexStep::Done,
             }
         });
@@ -272,6 +251,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+
     /// Consumes the structure and start the lexing process.
     /// # Returns
     /// Vec of Token structures.
@@ -283,15 +263,15 @@ impl<'a> Lexer<'a> {
                 NextStep::LexNumberType => {
                     step = LexCharacter;
                     self.lex_number();
-                },
+                }
                 NextStep::LexName => {
                     step = LexCharacter;
                     self.lex_name();
-                },
+                }
                 NextStep::LexString => {
                     step = LexCharacter;
                     self.lex_string();
-                },
+                }
                 NextStep::LexBooleanOrNull => {
                     step = LexCharacter;
                     self.lex_boolean_or_null();
@@ -300,9 +280,10 @@ impl<'a> Lexer<'a> {
             }
         }
 
-       self.tokens
+        self.tokens
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -337,7 +318,7 @@ mod tests {
             JsonToken::Name("f4".to_owned()), JsonToken::Colon, JsonToken::Value(JsonType::Int), JsonToken::ObjectEnd,
             JsonToken::Comma, JsonToken::Name("f2".to_owned()), JsonToken::Colon, JsonToken::ArrayStart,
             JsonToken::Value(JsonType::Int), JsonToken::Comma, JsonToken::Value(JsonType::Int), JsonToken::Comma,
-            JsonToken::Value(JsonType::Int), JsonToken::ArrayEnd, JsonToken::ObjectEnd
+            JsonToken::Value(JsonType::Int), JsonToken::ArrayEnd, JsonToken::ObjectEnd,
         ];
 
         let lexer = Lexer::new(json);
@@ -397,7 +378,7 @@ mod tests {
         let json = ",\"hola\"";
         let expected_result = vec![
             JsonToken::Comma,
-            JsonToken::Name("hola".to_owned())
+            JsonToken::Name("hola".to_owned()),
         ];
 
         let lexer = Lexer::new(json);
@@ -442,7 +423,7 @@ mod tests {
         let expected_result = vec![
             JsonToken::ObjectStart, JsonToken::Name("2".to_owned()), JsonToken::Colon,
             JsonToken::Value(JsonType::String), JsonToken::Comma, JsonToken::Name("ab".to_owned()),
-            JsonToken::Colon, JsonToken::Value(JsonType::Int), JsonToken::ObjectEnd
+            JsonToken::Colon, JsonToken::Value(JsonType::Int), JsonToken::ObjectEnd,
         ];
 
         let lexer = Lexer::new(json);
@@ -452,9 +433,9 @@ mod tests {
 
     #[test]
     fn lex_bool_end_on_right_brace() {
-        let json =  "true}";
+        let json = "true}";
         let expected_result = vec![
-            JsonToken::Value(JsonType::Bool), JsonToken::ObjectEnd
+            JsonToken::Value(JsonType::Bool), JsonToken::ObjectEnd,
         ];
 
         let lexer = Lexer::new(json);
