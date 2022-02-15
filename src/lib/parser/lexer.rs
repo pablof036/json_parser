@@ -114,7 +114,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Basic lexer for primitive types. Runs a closure which returns the next step for the lexer (advance the iterator, skip a character or end the lexer).
-    /// # Parameter
+    /// # Arguments
     /// * `f` - Closure which runs for each next characters. The iterator will be advanced (or not) depending of the returned value.
     /// # Returns
     /// Column of the first character of the token. For error message support.

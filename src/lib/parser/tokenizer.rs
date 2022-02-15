@@ -6,7 +6,7 @@ use crate::lib::model::token::{JsonToken, JsonType, Token};
 use crate::lib::parser::tokenizer::TokenizerError::{NullNotSupportedError, SyntaxError};
 
 #[derive(Error, Debug)]
-enum TokenizerError {
+pub enum TokenizerError {
     #[error("syntax error detected near line {} column {1}", .0 + 1)]
     SyntaxError(usize, usize),
     #[error("unknown syntax error")]
@@ -29,6 +29,14 @@ impl Tokenizer {
         }
     }
 
+    /// Parses a new array, if the array's type is an object, it will join the object's fields.
+    /// # Arguments
+    /// * `old_type` previous array, if it's an object, its field will be joined with those of the new type.
+    /// * `new_type` new array type
+    /// # Returns
+    /// New array type
+    /// # Errors
+    /// If the old type is not the same as the new type, an error will be returned.
     fn parse_new_array_type(old_type: Option<JsonArrayType>, new_type: JsonArrayType, line: usize, col: usize) -> Result<JsonArrayType, TokenizerError> {
         if let Some(old_type) = old_type {
             if old_type == new_type {
@@ -55,6 +63,9 @@ impl Tokenizer {
         Ok(new_type)
     }
 
+    /// Parses an array token
+    /// # Arguments
+    /// * `name` name of the array's field
     fn parse_array_token(&mut self, name: String) -> Result<JsonTree, TokenizerError> {
         let mut array_type = None;
 
@@ -106,6 +117,11 @@ impl Tokenizer {
         }
     }
 
+    /// Parses a list of [JsonToken]
+    /// # Returns
+    /// Object's fields
+    /// # Errors
+    /// If a syntax error is found, a [TokenizerError] will be returned.
     fn parse_object_token(&mut self) -> Result<Vec<JsonTree>, TokenizerError> {
         let mut object = Vec::new();
         let mut name = None;
@@ -172,7 +188,10 @@ impl Tokenizer {
         Ok(object)
     }
 
-    pub fn start_tokenizer(mut self) -> anyhow::Result<Vec<JsonTree>> {
+    /// Starts the conversion from the list of tokens to a [JsonTree].
+    /// # Returns
+    /// JSON representation in list of [JsonTree]
+    pub fn start_tokenizer(mut self) -> Result<Vec<JsonTree>, TokenizerError> {
         Ok(self.parse_object_token()?)
     }
 }

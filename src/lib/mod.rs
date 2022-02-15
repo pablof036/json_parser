@@ -21,7 +21,7 @@ pub struct Config {
 
 
 impl Config {
-    pub fn new(mut args: Args) -> anyhow::Result<Self> {
+    pub fn new(args: Args) -> anyhow::Result<Self> {
         let mut help = None;
 
         let mut definition_arg = None;
